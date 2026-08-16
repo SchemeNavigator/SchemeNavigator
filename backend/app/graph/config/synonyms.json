@@ -1,0 +1,6 @@
+{
+  "student": ["education", "scholarship", "learner", "academic", "youth"],
+  "farmer": ["agriculture", "crop", "cultivation", "kisan"],
+  "employment": ["job", "career", "livelihood", "skill", "work"],
+  "women": ["female", "girl", "mother", "widow"]
+}

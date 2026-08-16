@@ -1,0 +1,5 @@
+{
+  "scholarship": ["Student", "Education", "Merit", "Financial Assistance"],
+  "farmer": ["Agriculture", "Kisan", "Crop"],
+  "health": ["Medical", "Insurance", "Wellness"]
+}

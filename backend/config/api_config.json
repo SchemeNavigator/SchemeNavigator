@@ -1,0 +1,8 @@
+{
+  "version": "v1",
+  "timeout_seconds": 60,
+  "debug": true,
+  "maximum_execution_time_seconds": 120,
+  "max_payload_bytes": 1048576,
+  "supported_versions": ["v1", "v2"]
+}

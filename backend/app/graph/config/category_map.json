@@ -1,0 +1,6 @@
+{
+  "education": ["Education & Learning", "Skill Development", "Scholarship", "Youth"],
+  "health": ["Medical", "Insurance", "Healthcare", "Wellness"],
+  "agriculture": ["Agriculture", "Farming", "Crop Support"],
+  "employment": ["Employment", "Skill Development", "Livelihood"]
+}
