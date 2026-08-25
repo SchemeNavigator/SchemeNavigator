@@ -46,4 +46,5 @@ def test_planner_agent_success():
     agent = PlannerAgentImpl(ctx)
     updated = agent.plan(state)
     assert updated.planner_output is not None
-    assert updated.metadata.planner_result
+    assert updated.metadata.planner_result["application_roadmap"][0]["title"] == "Collect ID"
+    assert updated.next_node == "verification"

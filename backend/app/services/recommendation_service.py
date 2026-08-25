@@ -25,6 +25,7 @@ from app.graph.state import WorkflowState, WorkflowStatus
 from app.models.agent_models import PlannerResult, Recommendation, ResearchResult, VerificationResult, WorkflowResult
 from app.models.survey import SurveyRequest
 from app.repositories.scheme_repository import SchemeRepository
+from app.utils.verification import normalize_verification_result
 
 
 class UnavailableLLMService:
@@ -384,25 +385,7 @@ class RecommendationService:
         return normalized
 
     def _normalize_verification_result(self, value: Any) -> VerificationResult | None:
-        if value is None:
-            return None
-        if isinstance(value, VerificationResult):
-            return value
-
-        raw = value.model_dump() if hasattr(value, "model_dump") else getattr(value, "__dict__", {})
-        verification_status = raw.get("verification_status") or raw.get("final_verdict") or "completed"
-        verified_scheme_ids = raw.get("verified_scheme_ids") or []
-        rejected_scheme_ids = raw.get("rejected_scheme_ids") or []
-        notes = raw.get("notes") or []
-        if raw.get("audit_summary"):
-            notes = list(notes) + [str(raw.get("audit_summary"))]
-
-        return VerificationResult(
-            verification_status=str(verification_status),
-            verified_scheme_ids=list(verified_scheme_ids),
-            rejected_scheme_ids=list(rejected_scheme_ids),
-            notes=[str(note) for note in notes],
-        )
+        return normalize_verification_result(value)
 
     def _derive_verdict(self, readiness_score: float | None, verification_result: VerificationResult | None) -> str:
         if verification_result and verification_result.verification_status:

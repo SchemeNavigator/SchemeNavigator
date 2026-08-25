@@ -83,6 +83,7 @@ class WorkflowMetadata(BaseModel):
     latency_ms: Optional[int] = None
     repository_results_count: Optional[int] = None
     decision_trace: List[dict[str, Any]] = Field(default_factory=list)
+    planner_result: dict[str, Any] = Field(default_factory=dict)
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
 

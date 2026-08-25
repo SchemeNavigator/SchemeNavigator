@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List
 
 from .planner_models import PlannerResultDetailed, RoadmapStep
-from ..graph.state import WorkflowError
+from ...graph.state import WorkflowError
 
 
 def validate_roadmap(result: PlannerResultDetailed) -> List[WorkflowError]:

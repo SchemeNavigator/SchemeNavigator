@@ -9,7 +9,7 @@ from ..verification.models import (
     DocumentReport,
     WorkflowReport,
 )
-from ..graph.state import WorkflowState
+from ...graph.state import WorkflowState
 
 
 def consistency_validator(state: WorkflowState) -> ConsistencyReport:

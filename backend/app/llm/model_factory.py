@@ -55,6 +55,7 @@ class OpenRouterHTTPWrapper(BaseModelWrapper):
         payload = {
             "model": self.model_name,
             "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": kwargs.get("max_tokens") or 4096,
         }
         params = {}
         if "max_tokens" in kwargs:

@@ -12,6 +12,7 @@ from .validators import consistency_validator, eligibility_validator, document_v
 from ..graph.context import ExecutionContext
 from ..graph.state import WorkflowState, Message, WorkflowError
 from ..llm.exceptions import JSONParsingError
+from ...utils.verification import normalize_verification_result as _normalize_verification_result
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "verification_config.json")
 
@@ -85,6 +86,7 @@ class VerificationAgent:
                 result = llm.generate_json("verification", variables, VerificationResult)
             except Exception as exc:
                 state.errors.append(WorkflowError(node="verification", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
+                state.next_node = None
                 return state
         except Exception as exc:
             state.errors.append(WorkflowError(node="verification", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=False))
@@ -92,6 +94,7 @@ class VerificationAgent:
 
         # Update state.verification_output and final_response (WorkflowResult)
         state.verification_output = result
+        aggregate_result = _normalize_verification_result(result)
 
         # Build final WorkflowResult minimal mapping
         from ..models.agent_models import WorkflowResult as WFResult, Recommendation
@@ -101,7 +104,7 @@ class VerificationAgent:
             recommendations=state.ranked_schemes,
             research_result=None,
             planner_result=state.planner_output,
-            verification_result=result,
+            verification_result=aggregate_result,
         )
 
         state.final_response = wf
@@ -109,6 +112,7 @@ class VerificationAgent:
         msg = Message(role="system", content="Verification completed", timestamp=now, metadata={"node": "verification"})
         state.messages.append(msg)
         state.metadata.finished_at = now
+        state.next_node = None
 
         self.logger.info("Verification Finished")
         return state

@@ -9,10 +9,10 @@ from .scheme_extractor import extract_scheme_context
 from .timeline_builder import build_timeline
 from .planner_models import PlannerResultDetailed
 from .roadmap_validator import validate_roadmap
-from ..agents.planner import PlannerAgent as Placeholder
-from ..graph.context import ExecutionContext
-from ..graph.state import WorkflowState, Message, WorkflowError
-from ..llm.exceptions import JSONParsingError
+from . import PlannerAgent as Placeholder
+from ...graph.context import ExecutionContext
+from ...graph.state import WorkflowState, Message, WorkflowError
+from ...llm.exceptions import JSONParsingError
 
 
 class PlannerAgentImpl(Placeholder):
@@ -73,6 +73,7 @@ class PlannerAgentImpl(Placeholder):
                 detailed = llm.generate_json("planner", variables, PlannerResultDetailed)
             except Exception as exc:
                 state.errors.append(WorkflowError(node="planner", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
+                state.next_node = None
                 return state
         except Exception as exc:
             state.errors.append(WorkflowError(node="planner", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=False))
@@ -85,7 +86,7 @@ class PlannerAgentImpl(Placeholder):
             return state
 
         # Map minimal PlannerResult to state's planner_output (use existing model shape)
-        from ..models.agent_models import PlannerResult as SimplePlanner
+        from ...models.agent_models import PlannerResult as SimplePlanner
 
         plan_steps = [step.title for step in detailed.application_roadmap]
         simple = SimplePlanner(goal=planning_context.get("scheme_name"), plan_steps=plan_steps, selected_scheme_ids=[planning_context.get("scheme_id")])
@@ -98,6 +99,7 @@ class PlannerAgentImpl(Placeholder):
         msg = Message(role="system", content=f"Planner generated {len(plan_steps)} steps", timestamp=now, metadata={"node": "planner"})
         state.messages.append(msg)
         state.metadata.finished_at = now
+        state.next_node = "verification"
 
         self.logger.info("Planner Finished")
         return state
