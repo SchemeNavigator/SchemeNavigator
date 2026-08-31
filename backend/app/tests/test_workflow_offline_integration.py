@@ -1,6 +1,9 @@
 import json
 import sys
 import time
+import asyncio
+import threading
+from unittest.mock import Mock
 
 import app.agents as agents_package
 import app.graph as graph_package
@@ -31,21 +34,29 @@ from app.agents.verification.models import (
     WorkflowReport,
 )
 from app.graph.intent_node import IntentResult, RepositoryQueryOutput
+from app.graph.context import ExecutionContext
 from app.graph.recommendation_models import RecommendationEntry, RecommendationResult
+from app.graph.recommendation_node import RecommendationNode
+from app.graph.state import WorkflowState
 from app.graph.workflow_engine import WorkflowEngine
 from app.llm.output_parser import OutputParser
 from app.llm.prompt_manager import PromptManager
 from app.models.survey import SurveyRequest
 from app.repositories.scheme_repository import SchemeRepository
 from app.services.llm_service import LLMService
+from app.services.recommendation_service import RecommendationService
+from app.core.api_config import ApiConfig
+from app.core.exceptions import WorkflowTimeoutError
 
 
 class OfflineProvider:
-    def __init__(self, scheme_id: str, scheme_name: str) -> None:
+    def __init__(self, scheme_id: str, scheme_name: str, recommendation_delay: float = 0.0) -> None:
         self.scheme_id = scheme_id
         self.scheme_name = scheme_name
         self.model_name = "offline-test-model"
         self.calls: list[str] = []
+        self.recommendation_delay = recommendation_delay
+        self.recommendation_finished = threading.Event()
 
     def generate(self, prompt: str, max_tokens=None, temperature=None):
         if "Intent Agent" in prompt:
@@ -65,6 +76,8 @@ class OfflineProvider:
             )
         elif "Recommendation Agent" in prompt:
             label = "recommendation"
+            if self.recommendation_delay:
+                time.sleep(self.recommendation_delay)
             payload = RecommendationResult(
                 recommendations=[
                     RecommendationEntry(
@@ -154,6 +167,8 @@ class OfflineProvider:
             raise AssertionError("Unexpected LLM prompt")
 
         self.calls.append(label)
+        if label == "recommendation":
+            self.recommendation_finished.set()
         return {"raw": {"choices": [{"message": {"content": json.dumps(payload.model_dump())}}]}}
 
 
@@ -174,6 +189,7 @@ def test_offline_workflow_uses_actual_routing_contract(tmp_path, monkeypatch):
     llm.model = provider
 
     engine = WorkflowEngine(llm_service=llm, repository=repository)
+    engine.response_builder = Mock(wraps=engine.response_builder)
     started_nodes: list[str] = []
     engine.event_bus.subscribe("node_started", lambda event: started_nodes.append(event.node))
 
@@ -206,6 +222,7 @@ def test_offline_workflow_uses_actual_routing_contract(tmp_path, monkeypatch):
     assert started_nodes == [
         "intent_extraction",
         "repository_retrieval",
+        "eligibility_gate",
         "recommendation",
         "planner",
         "verification",
@@ -224,3 +241,81 @@ def test_offline_workflow_uses_actual_routing_contract(tmp_path, monkeypatch):
     assert final_state.next_node is None
     assert final_state.errors == []
     assert final_state.final_response is not None
+    engine.response_builder.build.assert_called_once_with(final_state)
+
+
+def test_recommendation_timeout_cancels_thread_before_planner(tmp_path):
+    csv_path = tmp_path / "schemes.csv"
+    csv_path.write_text(
+        "scheme_name,slug,details,benefits,eligibility,application,documents,level,schemeCategory,tags\n"
+        "Delhi Student Scholarship,delhi-student-scholarship,Support for Delhi students,Education support,Students in Delhi,Apply with supplied information,Identity proof,State,Education,Student\n",
+        encoding="utf-8",
+    )
+    repository = SchemeRepository(csv_path)
+    candidate = repository.load_all()[0]
+    provider = OfflineProvider(candidate.slug, candidate.scheme_name, recommendation_delay=0.15)
+    llm = LLMService.__new__(LLMService)
+    llm.prompt_manager = PromptManager()
+    llm.output_parser = OutputParser()
+    llm.model = provider
+    engine = WorkflowEngine(llm_service=llm, repository=repository, config={"timeout_seconds": 0.05})
+    engine.response_builder = Mock(wraps=engine.response_builder)
+    service = RecommendationService(
+        workflow_engine=engine,
+        repository=repository,
+        llm_service=llm,
+        api_config=ApiConfig(timeout_seconds=0.05, maximum_execution_time_seconds=1),
+    )
+    survey = SurveyRequest(
+        age=20,
+        gender="unspecified",
+        state="Delhi",
+        category="student",
+        employment_status="student",
+        occupation="student",
+    )
+
+    async def invoke():
+        await service.recommend(survey, request_id="offline-timeout")
+
+    try:
+        asyncio.run(invoke())
+    except WorkflowTimeoutError:
+        pass
+    else:
+        raise AssertionError("Expected workflow timeout")
+
+    assert provider.recommendation_finished.wait(1.0)
+    assert provider.calls == ["intent", "recommendation"]
+    assert engine.response_builder.call_count == 0
+    record = service.workflow_store.get(next(iter(service.workflow_store.list_ids())))
+    assert record is not None
+    assert record.state.workflow_status.value == "cancelled"
+    assert record.state.next_node is None
+    assert record.state.planner_output is None
+    assert record.state.verification_output is None
+
+
+def test_recommendation_uses_compact_projection_and_keeps_full_candidates(tmp_path):
+    csv_path = tmp_path / "schemes.csv"
+    csv_path.write_text(
+        "scheme_name,slug,details,benefits,eligibility,application,documents,level,schemeCategory,tags\n"
+        + "Long Scheme, long-scheme,"
+        + ("Detailed evidence. " * 1000)
+        + ",Useful benefit,Eligible citizens,Apply online,Identity proof,State,Education,Student\n",
+        encoding="utf-8",
+    )
+    repository = SchemeRepository(csv_path)
+    candidate = repository.load_all()[0]
+    state = WorkflowState(candidate_schemes=[candidate], eligible_schemes=[candidate])
+    projection = RecommendationNode(ExecutionContext(state))._build_context(state)["candidates"][0]
+
+    assert projection["scheme_id"] == candidate.slug
+    assert projection["scheme_name"] == candidate.scheme_name
+    assert projection["eligibility"] == candidate.eligibility
+    assert projection["benefits"] == candidate.benefits
+    assert projection["details"] is None
+    assert "documents" not in projection
+    assert "application" not in projection
+    assert candidate.documents == "Identity proof"
+    assert state.candidate_schemes[0].documents == candidate.documents

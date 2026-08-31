@@ -60,12 +60,11 @@ class RepositoryRetrievalNode(WorkflowNode):
 
         self.logger.info("Retrieval Finished: %s candidates", len(collection.candidate_schemes))
 
-        # On successful retrieval, explicitly advance to the recommendation node
-        # to avoid re-running repository_retrieval due to stale state.next_node
+        # Eligibility must be decided before ranking. Do not skip directly to
+        # recommendation generation with raw retrieval candidates.
         try:
-            state.next_node = "recommendation"
+            state.next_node = "eligibility_gate"
         except Exception:
-            # preserve existing behavior if assignment fails for any reason
-            self.logger.exception("Failed to set next_node to recommendation")
+            self.logger.exception("Failed to set next_node to eligibility_gate")
 
         return state

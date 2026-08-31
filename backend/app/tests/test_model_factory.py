@@ -1,7 +1,7 @@
 import os
 
-from ...llm.model_factory import ModelFactory
-from ...llm.exceptions import ConfigurationError
+from ..llm.model_factory import ModelFactory
+from ..llm.exceptions import ConfigurationError
 
 
 def test_missing_env_raises(monkeypatch):

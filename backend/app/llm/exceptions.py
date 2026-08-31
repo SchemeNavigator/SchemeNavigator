@@ -21,6 +21,10 @@ class JSONParsingError(LLMError):
     pass
 
 
+class JSONSchemaValidationError(JSONParsingError):
+    pass
+
+
 class PromptValidationError(LLMError):
     pass
 

@@ -9,7 +9,7 @@ from app.repositories.scheme_repository import SchemeRepository
 
 
 def test_repository_retrieval_sets_next_node() -> None:
-    """Bounded regression test: retrieval returns candidates and advances to recommendation.
+    """Bounded regression test: retrieval returns candidates and advances to eligibility.
 
     - Does not call any LLM/OpenRouter code.
     - Uses the real CSV-backed repository but only exercises the retrieval node.
@@ -32,10 +32,10 @@ def test_repository_retrieval_sets_next_node() -> None:
     # retrieval produced candidates
     assert len(updated.candidate_schemes) > 0
 
-    # node now explicitly advances to recommendation
-    assert updated.next_node == "recommendation"
+    # Eligibility must run before a candidate can reach recommendation.
+    assert updated.next_node == "eligibility_gate"
 
-    # router should honor that and return recommendation
+    # router should honor that and return the eligibility gate
     router = ConditionalRouter({})
     next_node, trace = router.decide(updated)
-    assert next_node == "recommendation"
+    assert next_node == "eligibility_gate"

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import time
+from threading import Event
 from typing import Optional, List
 
 from .context import ExecutionContext
@@ -25,15 +27,17 @@ class WorkflowEngine:
             from .intent_node import IntentExtractionNode
             from .query_expansion_node import QueryExpansionNode
             from .repository_retrieval_node import RepositoryRetrievalNode
+            from .eligibility_node import EligibilityGateNode
             from .recommendation_node import RecommendationNode
         except Exception:
             # missing optional nodes are fine
             IntentExtractionNode = None
             QueryExpansionNode = None
             RepositoryRetrievalNode = None
+            EligibilityGateNode = None
             RecommendationNode = None
 
-        for cls in (IntentExtractionNode, QueryExpansionNode, RepositoryRetrievalNode, RecommendationNode):
+        for cls in (IntentExtractionNode, QueryExpansionNode, RepositoryRetrievalNode, EligibilityGateNode, RecommendationNode):
             if cls is None:
                 continue
             try:
@@ -58,7 +62,18 @@ class WorkflowEngine:
 
     def run(self, state: Optional[WorkflowState] = None) -> WorkflowState:
         state = state or self.new_state()
-        ctx = ExecutionContext(state=state, llm_service=self.llm_service, repository=self.repository, logger=self.logger, config=self.config)
+        timeout_seconds = self.config.get("timeout_seconds")
+        deadline = time.monotonic() + float(timeout_seconds) if timeout_seconds is not None else None
+        ctx = ExecutionContext(
+            state=state,
+            llm_service=self.llm_service,
+            repository=self.repository,
+            logger=self.logger,
+            config=self.config,
+            workflow_deadline=deadline,
+            cancellation_event=getattr(state, "_cancellation_event", None) or Event(),
+        )
+        state._cancellation_event = ctx.cancellation_event
 
         exec_mgr = ExecutionManager(context=ctx, registry=self.registry, event_bus=self.event_bus, state_manager=self.state_manager, checkpoint_manager=self.checkpoint_manager, config=self.config)
 
@@ -72,6 +87,8 @@ class WorkflowEngine:
         final_state = exec_mgr.run(start_node, state)
 
         # build response
+        if ctx.is_cancelled():
+            return ctx.stop_state(final_state)
         result = self.response_builder.build(final_state)
         final_state.final_response = result
         return final_state

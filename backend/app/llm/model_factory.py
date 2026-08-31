@@ -148,7 +148,10 @@ class LangChainWrapper(BaseModelWrapper):
         # Use sync call; LangChain returns an LLMResult
         start = time.time()
         message = self._HumanMessage(content=prompt)
-        result = self._client.generate([[message]])
+        generation_kwargs = {}
+        if kwargs.get("max_tokens") is not None:
+            generation_kwargs["max_tokens"] = kwargs["max_tokens"]
+        result = self._client.generate([[message]], **generation_kwargs)
         latency_ms = int((time.time() - start) * 1000)
         return {"raw": result, "latency_ms": latency_ms}
 

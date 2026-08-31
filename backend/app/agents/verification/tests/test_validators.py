@@ -1,5 +1,5 @@
-from ..verification.validators import _split_docs, consistency_validator, eligibility_validator, document_validator, workflow_validator
-from ...graph.state import WorkflowState
+from ..validators import _split_docs, consistency_validator, eligibility_validator, document_validator, workflow_validator
+from ....graph.state import WorkflowState
 
 
 def test_split_docs():

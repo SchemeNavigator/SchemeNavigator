@@ -4,7 +4,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ..models.survey import SurveyRequest
 from ..models.scheme import Scheme
@@ -83,6 +83,8 @@ class WorkflowMetadata(BaseModel):
     latency_ms: Optional[int] = None
     repository_results_count: Optional[int] = None
     decision_trace: List[dict[str, Any]] = Field(default_factory=list)
+    recommendation_result: dict[str, Any] = Field(default_factory=dict)
+    overall_confidence: Optional[float] = None
     planner_result: dict[str, Any] = Field(default_factory=dict)
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
@@ -101,6 +103,8 @@ class WorkflowState(BaseModel):
     intent: Intent = Field(default_factory=Intent)
     repository_query: RepositoryQuery = Field(default_factory=RepositoryQuery)
     candidate_schemes: List[Scheme] = Field(default_factory=list)
+    eligible_schemes: List[Scheme] = Field(default_factory=list)
+    eligibility_decisions: dict[str, dict[str, Any]] = Field(default_factory=dict)
     ranked_schemes: List[Recommendation] = Field(default_factory=list)
     selected_scheme: Optional[Recommendation] = None
     planner_output: Optional[PlannerResult] = None
@@ -114,6 +118,7 @@ class WorkflowState(BaseModel):
     errors: List[WorkflowError] = Field(default_factory=list)
     current_node: Optional[str] = None
     next_node: Optional[str] = None
+    _cancellation_event: Any = PrivateAttr(default=None)
 
 
 class SharedState(BaseModel):

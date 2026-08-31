@@ -1,5 +1,17 @@
 {
   "min_score": 30,
   "min_confidence": 0.3,
-  "max_recommendations": 5
+  "max_recommendations": 3,
+  "max_candidates_for_prompt": 4,
+  "candidate_fields": [
+    "scheme_id",
+    "scheme_name",
+    "details",
+    "benefits",
+    "eligibility",
+    "level",
+    "scheme_category",
+    "tags"
+  ],
+  "max_detail_chars": 300
 }

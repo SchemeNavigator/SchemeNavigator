@@ -32,3 +32,24 @@ def test_weighted_scoring_and_filtering():
     assert collection.total_candidates >= 1
     # top candidate should be s1
     assert collection.candidate_schemes[0].scheme.slug == "s1"
+
+
+def test_retrieval_applies_configured_top_n_limit():
+    schemes = [
+        sample_scheme(
+            f"Student Scholarship {index}",
+            f"student-{index}",
+            "Education",
+            ["student"],
+            "state",
+            details="student scholarship support",
+        )
+        for index in range(25)
+    ]
+    collection = RetrievalEngine(MockRepo(schemes)).retrieve(
+        {"weighted_keywords": [{"keyword": "student", "weight": 1.0}]}
+    )
+
+    assert collection.total_candidates == 20
+    assert len(collection.candidate_schemes) == 20
+    assert collection.candidate_schemes[0].relevance_score >= collection.candidate_schemes[-1].relevance_score

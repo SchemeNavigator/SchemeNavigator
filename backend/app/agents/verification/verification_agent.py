@@ -9,9 +9,9 @@ from typing import Optional
 
 from .models import VerificationResult
 from .validators import consistency_validator, eligibility_validator, document_validator, workflow_validator
-from ..graph.context import ExecutionContext
-from ..graph.state import WorkflowState, Message, WorkflowError
-from ..llm.exceptions import JSONParsingError
+from ...graph.context import ExecutionContext
+from ...graph.state import WorkflowState, Message, WorkflowError
+from ...llm.exceptions import JSONParsingError
 from ...utils.verification import normalize_verification_result as _normalize_verification_result
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "verification_config.json")
@@ -65,6 +65,9 @@ class VerificationAgent:
             state.errors.append(err)
             return state
 
+        if self.context.is_cancelled():
+            return self.context.stop_state(state)
+
         variables = {
             "consistency": consistency.model_dump() if hasattr(consistency, "model_dump") else consistency.dict(),
             "eligibility": eligibility.model_dump() if hasattr(eligibility, "model_dump") else eligibility.dict(),
@@ -79,17 +82,16 @@ class VerificationAgent:
 
         try:
             result: VerificationResult = llm.generate_json("verification", variables, VerificationResult)
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
             self.logger.info("Audit Generated")
-        except JSONParsingError:
-            # retry once
-            try:
-                result = llm.generate_json("verification", variables, VerificationResult)
-            except Exception as exc:
-                state.errors.append(WorkflowError(node="verification", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
-                state.next_node = None
-                return state
+        except JSONParsingError as exc:
+            state.errors.append(WorkflowError(node="verification", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
+            state.next_node = None
+            return state
         except Exception as exc:
             state.errors.append(WorkflowError(node="verification", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=False))
+            state.next_node = None
             return state
 
         # Update state.verification_output and final_response (WorkflowResult)
@@ -97,7 +99,7 @@ class VerificationAgent:
         aggregate_result = _normalize_verification_result(result)
 
         # Build final WorkflowResult minimal mapping
-        from ..models.agent_models import WorkflowResult as WFResult, Recommendation
+        from ...models.agent_models import WorkflowResult as WFResult, Recommendation
 
         wf = WFResult(
             workflow_id=None,

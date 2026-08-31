@@ -19,7 +19,7 @@ from .nodes import WorkflowNode
 from .context import ExecutionContext
 from .state import WorkflowState, Message, WorkflowError
 from .recommendation_models import RecommendationResult, RecommendationEntry
-from ..llm.exceptions import JSONParsingError
+from ..llm.exceptions import JSONParsingError, JSONSchemaValidationError
 
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "recommendation_config.json")
@@ -43,25 +43,26 @@ class RecommendationNode(WorkflowNode):
         self.logger = context.logger or logging.getLogger(__name__)
 
     def _build_context(self, state: WorkflowState) -> dict:
-        # compact representation of each candidate
+        fields = CONFIG.get("candidate_fields", [])
+        max_detail_chars = int(CONFIG.get("max_detail_chars", 800))
+        max_candidates = int(CONFIG.get("max_candidates_for_prompt", len(getattr(state, "eligible_schemes", []) or [])))
         candidates = []
-        # candidate_schemes assumed to be list of Scheme; include retrieval metadata if available
-        for scheme in getattr(state, "candidate_schemes", []) or []:
-            # retrieval metadata may be in state.metadata or in repository_query.retrieval_metadata
-            # best-effort: include minimal fields
-            candidates.append({
-                "scheme_name": getattr(scheme, "scheme_name", None),
-                "summary": getattr(scheme, "details", None),
-                "benefits": getattr(scheme, "benefits", None),
-                "eligibility": getattr(scheme, "eligibility", None),
-                "required_documents": getattr(scheme, "documents", None),
-                "level": getattr(scheme, "level", None),
-                "scheme_category": getattr(scheme, "scheme_category", None),
-                # retrieval fields may be absent; include placeholders
-                "matched_keywords": [],
-                "retrieval_score": None,
-                "retrieval_explanation": None,
-            })
+        source_schemes = list(getattr(state, "eligible_schemes", []) or [])
+
+        # Safety boundary: never prompt on unfiltered retrieval results. If the gate
+        # has not run yet, do not silently fall back to all candidates.
+        if not source_schemes and getattr(state, "eligibility_decisions", {}):
+            source_schemes = []
+
+        for scheme in source_schemes[:max_candidates]:
+            candidate = {}
+            for field in fields:
+                source_field = "slug" if field == "scheme_id" else field
+                value = getattr(scheme, source_field, None)
+                if field == "details" and value and len(value) > max_detail_chars:
+                    value = None
+                candidate[field] = value
+            candidates.append(candidate)
 
         context = {
             "candidates": candidates,
@@ -91,6 +92,52 @@ class RecommendationNode(WorkflowNode):
                 # marks for filtering later
                 continue
 
+    @staticmethod
+    def _canonicalize_recommendations(
+        recommendations: list[RecommendationEntry], eligible_schemes: list[object]
+    ) -> list[RecommendationEntry]:
+        """Keep only eligible recommendations and restore their repository IDs.
+
+        An LLM may omit an optional ``scheme_id`` or return a slightly different
+        value even when it identifies the supplied scheme by name.  The planner
+        needs the canonical repository ID, so resolve recommendations against the
+        eligibility-gated candidates before continuing the workflow.
+        """
+        eligible_by_id = {}
+        eligible_by_name = {}
+        for scheme in eligible_schemes:
+            scheme_id = str(getattr(scheme, "slug", "") or "").strip()
+            scheme_name = str(getattr(scheme, "scheme_name", "") or "").strip()
+            if scheme_id:
+                eligible_by_id[scheme_id] = scheme
+            if scheme_name:
+                eligible_by_name[scheme_name.casefold()] = scheme
+
+        canonical: list[RecommendationEntry] = []
+        seen_ids: set[str] = set()
+        for recommendation in recommendations:
+            scheme_id = str(recommendation.scheme_id or "").strip()
+            scheme_name = str(recommendation.scheme_name or "").strip()
+            scheme = eligible_by_id.get(scheme_id)
+            if scheme is None and scheme_name:
+                scheme = eligible_by_name.get(scheme_name.casefold())
+            if scheme is None:
+                continue
+
+            canonical_id = str(getattr(scheme, "slug", "") or "").strip()
+            if not canonical_id or canonical_id in seen_ids:
+                continue
+
+            canonical_name = getattr(scheme, "scheme_name", None)
+            canonical.append(
+                recommendation.model_copy(
+                    update={"scheme_id": canonical_id, "scheme_name": canonical_name}
+                )
+            )
+            seen_ids.add(canonical_id)
+
+        return canonical
+
     def execute(self, state: WorkflowState) -> WorkflowState:
         self.logger.info("Recommendation Started")
         now = datetime.utcnow().isoformat()
@@ -101,27 +148,43 @@ class RecommendationNode(WorkflowNode):
             state.errors.append(err)
             return state
 
+        if self.context.is_cancelled():
+            return self.context.stop_state(state)
+
         variables = self._build_context(state)
 
         try:
             # call LLM
-            result: RecommendationResult = llm.generate_json("recommendation", variables, RecommendationResult)
+            generate_kwargs = {}
+            if self.context.workflow_deadline is not None:
+                generate_kwargs["retry_deadline"] = self.context.workflow_deadline
+            result: RecommendationResult = llm.generate_json(
+                "recommendation",
+                variables,
+                RecommendationResult,
+                **generate_kwargs,
+            )
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
             self.logger.info("JSON Parsed")
+        except JSONSchemaValidationError as exc:
+            self.logger.exception("Recommendation schema validation failed")
+            state.errors.append(WorkflowError(node=self.name, message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=False))
+            state.next_node = None
+            return state
         except JSONParsingError as exc:
-            self.logger.exception("Parsing failed, retrying once")
+            self.logger.exception("Parsing failed")
+            state.errors.append(WorkflowError(node=self.name, message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
+            # prevent workflow-level retry loop by clearing next_node on recoverable LLM parse failure
             try:
-                result = llm.generate_json("recommendation", variables, RecommendationResult)
-            except Exception as exc2:
-                state.errors.append(WorkflowError(node=self.name, message=str(exc2), exception_type=type(exc2).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
-                # prevent workflow-level retry loop by clearing next_node on recoverable LLM parse failure
-                try:
-                    state.next_node = None
-                except Exception:
-                    self.logger.exception("Failed to clear next_node after parsing retry failure")
-                return state
+                state.next_node = None
+            except Exception:
+                self.logger.exception("Failed to clear next_node after parsing failure")
+            return state
         except Exception as exc:
             self.logger.exception("Recommendation LLM call failed")
             state.errors.append(WorkflowError(node=self.name, message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=False))
+            state.next_node = None
             return state
 
         # post-parse validation
@@ -139,7 +202,22 @@ class RecommendationNode(WorkflowNode):
 
         # filter & select top recommendations
         max_rec = int(CONFIG.get("max_recommendations", 5))
-        filtered = [r for r in result.recommendations if r.overall_score >= float(CONFIG.get("min_score", 0)) and r.confidence >= float(CONFIG.get("min_confidence", 0.0))]
+        eligible_schemes = list(getattr(state, "eligible_schemes", []) or [])
+        eligibility_evaluated = bool(getattr(state, "eligibility_decisions", {}))
+        if eligible_schemes or eligibility_evaluated:
+            canonical_recommendations = self._canonicalize_recommendations(
+                result.recommendations, eligible_schemes
+            )
+        else:
+            # Preserve the node's standalone behaviour for callers that do not
+            # include the eligibility gate in their workflow.
+            canonical_recommendations = list(result.recommendations)
+        filtered = [
+            recommendation
+            for recommendation in canonical_recommendations
+            if recommendation.overall_score >= float(CONFIG.get("min_score", 0))
+            and recommendation.confidence >= float(CONFIG.get("min_confidence", 0.0))
+        ]
 
         # sort by overall_score descending
         filtered.sort(key=lambda r: r.overall_score, reverse=True)
@@ -147,13 +225,33 @@ class RecommendationNode(WorkflowNode):
         # update state.ranked_schemes (map to minimal Recommendation model for compatibility)
         from ..models.agent_models import Recommendation as SimpleRec
 
+        fallback_used = False
         state.ranked_schemes = []
         for rec in filtered[:max_rec]:
             state.ranked_schemes.append(SimpleRec(scheme_id=rec.scheme_id, scheme_name=rec.scheme_name, reason=rec.reason))
 
-        # selected_scheme = top recommendation
+        # If an eligible candidate exists but the LLM supplies no usable rank,
+        # preserve the safe eligibility result instead of sending the planner a
+        # missing selection.  This avoids a false service failure caused only by
+        # an incomplete ranking response.
         top = filtered[0] if filtered else None
-        state.selected_scheme = SimpleRec(scheme_id=top.scheme_id, scheme_name=top.scheme_name, reason=top.reason) if top else None
+        if top is not None:
+            state.selected_scheme = SimpleRec(
+                scheme_id=top.scheme_id,
+                scheme_name=top.scheme_name,
+                reason=top.reason,
+            )
+        elif eligible_schemes:
+            fallback = eligible_schemes[0]
+            state.selected_scheme = SimpleRec(
+                scheme_id=getattr(fallback, "slug", None),
+                scheme_name=getattr(fallback, "scheme_name", None),
+                reason="The scheme passed deterministic eligibility screening; review its details before applying.",
+            )
+            state.ranked_schemes.append(state.selected_scheme)
+            fallback_used = True
+        else:
+            state.selected_scheme = None
 
         # append system message and metadata
         msg = Message(role="system", content=f"Generated {len(filtered[:max_rec])} recommendations", timestamp=now, metadata={"node": self.name})
@@ -161,7 +259,9 @@ class RecommendationNode(WorkflowNode):
         # store full result for traceability
         # store full result for traceability - guard against metadata schema that disallows extra fields
         try:
-            state.metadata.recommendation_result = result.model_dump() if hasattr(result, "model_dump") else result.dict()
+            recommendation_result = result.model_dump() if hasattr(result, "model_dump") else result.dict()
+            recommendation_result["fallback_used"] = fallback_used
+            state.metadata.recommendation_result = recommendation_result
         except Exception:
             self.logger.exception("Failed to store recommendation_result in metadata; skipping")
         try:
@@ -172,10 +272,12 @@ class RecommendationNode(WorkflowNode):
 
         self.logger.info("Recommendations Generated: %d", len(filtered[:max_rec]))
 
-        # On successful recommendation generation, explicitly advance to planner
+        # Do not invoke the planner unless there is a selected scheme.  If no
+        # scheme passed the gate, let verification return an evidence-backed
+        # no-match result instead of failing with "No selected scheme".
         try:
-            state.next_node = "planner"
+            state.next_node = "planner" if state.selected_scheme else "verification"
         except Exception:
-            self.logger.exception("Failed to set next_node to planner after successful recommendation")
+            self.logger.exception("Failed to set the next node after recommendation")
 
         return state

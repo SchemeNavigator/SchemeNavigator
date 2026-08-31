@@ -80,9 +80,14 @@ class IntentExtractionNode(WorkflowNode):
             llm = self.context.llm_service
             if llm is None:
                 raise ModelUnavailableError("LLMService not available in context")
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
 
             # LLMService.generate_json handles prompt loading/rendering/parsing
             intent: IntentResult = llm.generate_json("intent", variables, IntentResult)
+
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
 
             self.logger.info("JSON Parsed")
 

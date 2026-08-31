@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List, Dict, Any
 
-from ..verification.models import (
+from .models import (
     ConsistencyReport,
     EligibilityAssessment,
     DocumentReport,

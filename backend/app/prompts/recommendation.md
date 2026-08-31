@@ -33,15 +33,19 @@ Contract rules:
 - Each item in recommendations must use exactly these fields: scheme_id, scheme_name, overall_score, confidence, reason, pros, cons, eligibility_analysis, benefit_analysis, risk_analysis, required_documents_summary, recommended_priority.
 - Every field shown above is required as a key, including fields whose value is null. Never omit a required key.
 - recommendations, pros, and cons must be arrays. limitations and missing_information must be arrays of strings.
+- Return no more than 5 recommendation entries, ordered from highest to lowest overall_score.
+- Return no more than 3 recommendation entries. Keep each reason, eligibility_analysis, benefit_analysis, risk_analysis, and required_documents_summary under 20 words. Return at most 2 short strings in pros and cons. Set unsupported nullable fields to null and avoid repeating scheme text.
 - Use null for unavailable values in nullable fields. Use an empty list when no list values are available.
 - overall_score must be a number from 0 to 100.
 - confidence and overall_confidence must be numbers from 0.0 to 1.0.
 - scheme_id must correspond to the supplied candidate's ID, and scheme_name must correspond to the supplied candidate's name.
 - Explain trade-offs using pros, cons, eligibility_analysis, benefit_analysis, risk_analysis, and required_documents_summary.
+- Use the supplied details, benefits, eligibility, level, category, and tags as ranking evidence. Required documents are verified later and are not supplied here.
 - Use missing_information and limitations to explicitly identify uncertainty.
 - Do not claim eligibility. This agent ranks and explains candidates; it does not make a final eligibility determination.
 - Do not invent eligibility rules, benefits, documents, scheme IDs, scheme names, scores, or other facts not supported by the supplied candidate data.
 - Evaluate only the supplied candidate schemes and supplied citizen profile.
+- Keep every explanation concise; reference the candidate evidence instead of repeating full scheme descriptions.
 - Do not add extra top-level fields or extra recommendation-entry fields.
 
 Runtime context:

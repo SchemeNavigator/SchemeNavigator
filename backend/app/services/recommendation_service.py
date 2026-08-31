@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
+from threading import Event
 from typing import Any
 from uuid import uuid4
 
@@ -203,6 +204,7 @@ class RecommendationService:
         state.metadata.session_id = request_id
         state.metadata.started_at = started_at.isoformat()
         state.metadata.model_used = getattr(self.llm_service, "model_name", None)
+        state._cancellation_event = Event()
         self.workflow_store.save(workflow_id, state)
 
         try:
@@ -211,6 +213,7 @@ class RecommendationService:
                 timeout=self._workflow_timeout_seconds,
             )
         except asyncio.TimeoutError as exc:
+            state._cancellation_event.set()
             state.workflow_status = WorkflowStatus.CANCELLED
             state.metadata.finished_at = datetime.now(timezone.utc).isoformat()
             self.workflow_store.save(workflow_id, state)
@@ -249,6 +252,13 @@ class RecommendationService:
                 raise WorkflowDependencyError(
                     f"Workflow failed because a non-recoverable workflow error occurred: {failure_message}"
                 )
+
+            if self.api_config.require_verification and getattr(final_state, "verification_output", None) is None:
+                final_state.workflow_status = WorkflowStatus.FAILED
+                final_state.metadata.workflow_id = workflow_id
+                final_state.metadata.finished_at = datetime.now(timezone.utc).isoformat()
+                self.workflow_store.save(workflow_id, final_state)
+                raise WorkflowDependencyError("Workflow verification did not complete")
 
             final_state.workflow_status = WorkflowStatus.COMPLETED
             final_state.metadata.workflow_id = workflow_id

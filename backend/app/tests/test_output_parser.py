@@ -2,8 +2,8 @@ import json
 
 from pydantic import BaseModel
 
-from ...llm.output_parser import OutputParser
-from ...llm.exceptions import JSONParsingError
+from ..llm.output_parser import OutputParser
+from ..llm.exceptions import JSONParsingError
 
 
 class SimpleModel(BaseModel):

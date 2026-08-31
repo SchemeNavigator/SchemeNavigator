@@ -55,6 +55,9 @@ class PlannerAgentImpl(Placeholder):
             state.errors.append(err)
             return state
 
+        if self.context.is_cancelled():
+            return self.context.stop_state(state)
+
         variables = {
             "survey_summary": getattr(state.intent, "user_profile_summary", None),
             "selected_scheme": planning_context,
@@ -66,17 +69,16 @@ class PlannerAgentImpl(Placeholder):
 
         try:
             detailed: PlannerResultDetailed = llm.generate_json("planner", variables, PlannerResultDetailed)
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
             self.logger.info("LLM Parsed Planner Result")
-        except JSONParsingError:
-            # retry once
-            try:
-                detailed = llm.generate_json("planner", variables, PlannerResultDetailed)
-            except Exception as exc:
-                state.errors.append(WorkflowError(node="planner", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
-                state.next_node = None
-                return state
+        except JSONParsingError as exc:
+            state.errors.append(WorkflowError(node="planner", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=True))
+            state.next_node = None
+            return state
         except Exception as exc:
             state.errors.append(WorkflowError(node="planner", message=str(exc), exception_type=type(exc).__name__, timestamp=datetime.utcnow().isoformat(), recoverable=False))
+            state.next_node = None
             return state
 
         # Stage 4: Roadmap validation

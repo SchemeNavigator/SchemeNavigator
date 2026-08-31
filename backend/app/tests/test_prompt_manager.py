@@ -1,8 +1,8 @@
 import os
 from tempfile import TemporaryDirectory
 
-from ...llm.prompt_manager import PromptManager
-from ...llm.exceptions import PromptValidationError
+from ..llm.prompt_manager import PromptManager
+from ..llm.exceptions import PromptValidationError
 
 
 def test_load_and_render_prompt():

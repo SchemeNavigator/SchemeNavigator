@@ -17,6 +17,7 @@ class WorkflowBuilder:
             "intent_extraction",
             "query_expansion",
             "repository_retrieval",
+            "eligibility_gate",
             "recommendation",
             # decision node handled by ExecutionManager.router
             "planner",

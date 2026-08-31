@@ -12,7 +12,7 @@ from .checkpoint_manager import CheckpointManager
 from .conditional_router import ConditionalRouter, DecisionTrace
 from .context import ExecutionContext
 from .registry import NodeRegistry
-from .state import WorkflowState
+from .state import WorkflowState, WorkflowError
 
 
 @dataclass
@@ -44,6 +44,9 @@ class ExecutionManager:
 
     def execute_node(self, node_name: str, state: WorkflowState) -> NodeExecutionResult:
         start = time.time()
+        if self.context.is_cancelled():
+            self.context.stop_state(state)
+            return NodeExecutionResult(state, None, "cancelled", execution_time=0.0, metadata={}, errors=state.errors)
         self._emit("node_started", node=node_name, status="running")
         # instantiate node class from registry if available
         try:
@@ -86,6 +89,10 @@ class ExecutionManager:
                 else:
                     raise KeyError(f"Unknown node: {node_name}")
 
+            if self.context.is_cancelled():
+                self.context.stop_state(state)
+                return NodeExecutionResult(state, None, "cancelled", execution_time=time.time() - start, metadata={}, errors=state.errors)
+
             # post node cleanup
             try:
                 if node is not None:
@@ -111,8 +118,16 @@ class ExecutionManager:
             self.logger.exception("Execution failed for node %s", node_name)
             duration = time.time() - start
             self._emit("node_failed", node=node_name, duration=duration, status="failed", metadata={"error": str(exc)})
-            if isinstance(exc, KeyError) and "Unknown node" in str(exc):
-                state.next_node = None
+            state.errors.append(
+                WorkflowError(
+                    node=node_name,
+                    message=str(exc),
+                    exception_type=type(exc).__name__,
+                    timestamp=time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    recoverable=False,
+                )
+            )
+            state.next_node = None
             # determine retry policy
             retry_policy = self.config.get("retry_policy", {})
             node_policy = retry_policy.get(node_name, retry_policy.get("default", {}))
@@ -122,6 +137,8 @@ class ExecutionManager:
     def run(self, start_node: str, state: WorkflowState) -> WorkflowState:
         current = start_node
         while current is not None:
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
             self.logger.info("Executing node: %s", current)
             result = self.execute_node(current, state)
 
@@ -131,11 +148,16 @@ class ExecutionManager:
 
             # if failed and retry requested, attempt once
             if result.execution_status == "failed" and result.retry:
+                if self.context.is_cancelled():
+                    return self.context.stop_state(state)
                 self.logger.info("Retrying node: %s", current)
                 self._emit("retry_started", node=current, status="retry")
                 # single retry
                 result = self.execute_node(current, state)
                 self._emit("retry_finished", node=current, status=result.execution_status)
+
+            if self.context.is_cancelled():
+                return self.context.stop_state(state)
 
             # decision routing
             next_node, trace = self.router.decide(state)

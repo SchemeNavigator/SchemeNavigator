@@ -35,6 +35,7 @@ Contract rules:
 - Each application_roadmap item must use exactly these fields: step, title, description, estimated_time_minutes, dependencies, completion_criteria.
 - Every roadmap item must include estimated_time_minutes and completion_criteria as keys, using null when the supplied information is insufficient.
 - application_roadmap must not be empty.
+- Use no more than 5 roadmap steps. Keep each title and description concise, and use null or empty arrays whenever the supplied evidence does not support additional detail.
 - Every roadmap step must have a non-empty title and a non-empty description.
 - Step numbers must be unique, start at 1, and be sequential: 1, 2, 3, and so on.
 - timeline must be a list of objects. required_documents must be a list of objects. document_descriptions must be an object/dictionary keyed by document name or type. Do not invent a stricter schema for these fields.

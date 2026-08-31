@@ -6,14 +6,14 @@ from typing import Type, Any
 
 from pydantic import BaseModel, ValidationError
 
-from .exceptions import JSONParsingError
+from .exceptions import JSONParsingError, JSONSchemaValidationError
 
 
 class OutputParser:
     """Convert raw LLM responses (strings or dicts) into Pydantic models.
 
-    If parsing fails, the parser will attempt one retry before raising a
-    `JSONParsingError` with details.
+    The parser may recover JSON surrounded by provider prose, but it never
+    calls the provider and never retries schema validation failures.
     """
 
     @staticmethod
@@ -28,22 +28,21 @@ class OutputParser:
 
         text = to_text(raw)
 
-        last_exc: Exception | None = None
-        for attempt in range(2):
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            # Providers occasionally wrap an otherwise complete JSON object in
+            # prose or code fences. Recover that without another HTTP request.
+            start = text.find("{")
+            end = text.rfind("}")
+            if start == -1 or end <= start:
+                raise JSONParsingError("Malformed JSON: no complete object found") from exc
             try:
-                # attempt to load JSON then parse via pydantic
-                data = json.loads(text)
-                return model.model_validate(data)
-            except (json.JSONDecodeError, ValidationError) as exc:
-                last_exc = exc
-                # on first attempt, try to extract a JSON substring
-                if attempt == 0:
-                    # naive extraction: find first '{' and last '}'
-                    s = text.find("{")
-                    e = text.rfind("}")
-                    if s != -1 and e != -1 and e > s:
-                        text = text[s : e + 1]
-                        continue
-                break
+                data = json.loads(text[start : end + 1])
+            except json.JSONDecodeError as extracted_exc:
+                raise JSONParsingError("Malformed JSON response") from extracted_exc
 
-        raise JSONParsingError("Failed to parse model output") from last_exc
+        try:
+            return model.model_validate(data)
+        except ValidationError as exc:
+            raise JSONSchemaValidationError("JSON schema validation failed") from exc

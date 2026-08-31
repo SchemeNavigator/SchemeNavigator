@@ -1,8 +1,15 @@
 {
   "version": "v1",
-  "timeout_seconds": 60,
+  "timeout_seconds": 300,
   "debug": true,
-  "maximum_execution_time_seconds": 120,
+  "maximum_execution_time_seconds": 300,
+  "require_verification": true,
+  "llm_max_tokens": {
+    "intent": 2048,
+    "recommendation": 4096,
+    "planner": 4096,
+    "verification": 4096
+  },
   "max_payload_bytes": 1048576,
   "supported_versions": ["v1", "v2"]
 }

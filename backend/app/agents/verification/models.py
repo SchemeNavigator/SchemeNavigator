@@ -6,15 +6,15 @@ from pydantic import BaseModel, Field
 
 
 class ConsistencyReport(BaseModel):
-    planner_references_selected_scheme: bool
-    recommendation_exists: bool
-    planner_uses_same_eligibility: bool
-    planner_uses_same_documents: bool
+    planner_references_selected_scheme: bool = False
+    recommendation_exists: bool = False
+    planner_uses_same_eligibility: bool = False
+    planner_uses_same_documents: bool = False
     issues: List[str] = Field(default_factory=list)
 
 
 class EligibilityAssessment(BaseModel):
-    status: str  # Clearly Eligible | Possibly Eligible | Eligibility Uncertain | Likely Not Eligible
+    status: str = "Eligibility Uncertain"
     reasons: List[str] = Field(default_factory=list)
 
 
@@ -26,19 +26,19 @@ class DocumentReport(BaseModel):
 
 
 class WorkflowReport(BaseModel):
-    roadmap_exists: bool
-    timeline_complete: bool
-    ordered: bool
+    roadmap_exists: bool = False
+    timeline_complete: bool = False
+    ordered: bool = False
     duplicates: List[str] = Field(default_factory=list)
-    warnings_present: bool
-    next_action_present: bool
-    completeness_score: Optional[float]
+    warnings_present: bool = False
+    next_action_present: bool = False
+    completeness_score: Optional[float] = None
 
 
 class VerificationResult(BaseModel):
-    overall_readiness_score: float
-    overall_confidence: float
-    audit_summary: Optional[str]
+    overall_readiness_score: float = 0.0
+    overall_confidence: float = 0.0
+    audit_summary: Optional[str] = None
     consistency_assessment: ConsistencyReport
     eligibility_assessment: EligibilityAssessment
     document_assessment: DocumentReport
@@ -47,4 +47,4 @@ class VerificationResult(BaseModel):
     identified_limitations: List[str] = Field(default_factory=list)
     recommended_actions: List[str] = Field(default_factory=list)
     missing_information: List[str] = Field(default_factory=list)
-    final_verdict: str
+    final_verdict: str = "Unknown"

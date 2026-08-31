@@ -34,11 +34,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api_config = get_api_config()
 
     try:
-        llm_service = LLMService()
+        llm_service = LLMService(
+            max_tokens=api_config.llm_max_tokens,
+            retry_schema_validation=True,
+        )
     except Exception:
         llm_service = UnavailableLLMService()
 
-    workflow_engine = WorkflowEngine(llm_service=llm_service, repository=repository, config={"timeout_seconds": api_config.timeout_seconds})
+    workflow_engine = WorkflowEngine(
+        llm_service=llm_service,
+        repository=repository,
+        config={
+            "timeout_seconds": api_config.timeout_seconds,
+            "llm_max_tokens": api_config.llm_max_tokens,
+        },
+    )
     workflow_store = WorkflowStore()
     recommendation_service = RecommendationService(
         workflow_engine=workflow_engine,

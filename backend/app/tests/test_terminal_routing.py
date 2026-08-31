@@ -30,6 +30,9 @@ from app.agents.verification.models import (
 )
 from app.agents.verification.verification_agent import VerificationAgent
 from app.graph.context import ExecutionContext
+from app.graph.execution_manager import ExecutionManager
+from app.graph.nodes import WorkflowNode
+from app.graph.registry import NodeRegistry
 from app.graph.state import WorkflowState
 from app.llm.exceptions import JSONParsingError
 from app.models.agent_models import VerificationResult as StateVerificationResult
@@ -39,11 +42,22 @@ class MockLLM:
     def __init__(self, result=None, exc=None):
         self.result = result
         self.exc = exc
+        self.calls = 0
 
     def generate_json(self, prompt_name, variables, model):
+        self.calls += 1
         if self.exc:
             raise self.exc
         return self.result
+
+
+class CountingJSONParsingLLM:
+    def __init__(self):
+        self.calls = 0
+
+    def generate_json(self, prompt_name, variables, model):
+        self.calls += 1
+        raise JSONParsingError("invalid JSON")
 
 
 def planner_result():
@@ -119,6 +133,17 @@ def test_planner_recoverable_failure_clears_stale_route():
     assert updated.next_node is None
 
 
+def test_planner_does_not_retry_at_agent_boundary():
+    state = planner_state()
+    llm = CountingJSONParsingLLM()
+    context = ExecutionContext(state=state, llm_service=llm)
+
+    updated = PlannerAgentImpl(context).plan(state)
+
+    assert llm.calls == 1
+    assert updated.next_node is None
+
+
 def test_verification_success_terminates_routing(monkeypatch):
     state = WorkflowState(next_node="verification")
     context = ExecutionContext(state=state, llm_service=MockLLM(result=verification_result()))
@@ -138,9 +163,50 @@ def test_verification_success_terminates_routing(monkeypatch):
 
 def test_verification_recoverable_failure_clears_stale_route():
     state = WorkflowState(next_node="verification")
-    context = ExecutionContext(state=state, llm_service=MockLLM(exc=JSONParsingError("invalid JSON")))
+    llm = MockLLM(exc=JSONParsingError("invalid JSON"))
+    context = ExecutionContext(state=state, llm_service=llm)
 
     updated = VerificationAgent(context).verify(state)
 
+    assert llm.calls == 1
     assert updated.next_node != "verification"
     assert updated.next_node is None
+
+
+def test_verification_unrecoverable_agent_failure_clears_stale_route():
+    state = WorkflowState(next_node="verification")
+    context = ExecutionContext(state=state, llm_service=MockLLM(exc=RuntimeError("provider failed")))
+
+    updated = VerificationAgent(context).verify(state)
+
+    assert updated.next_node is None
+    assert updated.errors[-1].recoverable is False
+
+
+def test_unrecoverable_verification_exception_terminates_without_loop():
+    calls = 0
+
+    class FailingVerificationNode(WorkflowNode):
+        name = "verification"
+
+        def execute(self, state):
+            nonlocal calls
+            calls += 1
+            raise ModuleNotFoundError("No module named 'app.agents.graph'")
+
+    state = WorkflowState(next_node="verification")
+    registry = NodeRegistry()
+    registry.register(FailingVerificationNode)
+    manager = ExecutionManager(
+        context=ExecutionContext(state=state),
+        registry=registry,
+        config={"retry_policy": {"verification": {"retry": True}}},
+    )
+
+    updated = manager.run("verification", state)
+
+    assert calls == 2
+    assert updated.next_node is None
+    assert len(updated.errors) == 2
+    assert all(error.exception_type == "ModuleNotFoundError" for error in updated.errors)
+    assert all(error.recoverable is False for error in updated.errors)

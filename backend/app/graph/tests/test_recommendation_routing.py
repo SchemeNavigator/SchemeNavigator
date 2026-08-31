@@ -49,6 +49,8 @@ def test_recommendation_success_sets_planner():
 
     assert result_state.next_node == "planner"
     assert getattr(result_state, "ranked_schemes", []) is not None
+    assert result_state.metadata.recommendation_result["summary"] == "ok"
+    assert result_state.metadata.overall_confidence == 0.9
 
 
 def test_recommendation_failure_clears_next_node_and_appends_error():
@@ -60,6 +62,7 @@ def test_recommendation_failure_clears_next_node_and_appends_error():
     result_state = node.execute(state)
 
     assert result_state.next_node is None
+    assert llm.calls == 1
     assert any(err.node == "recommendation" for err in result_state.errors)
 
 

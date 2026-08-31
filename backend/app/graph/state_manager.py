@@ -45,7 +45,23 @@ class StateManager:
         # Nodes generally mutate in-place; defensively create a new state merging selected fields
         merged = base
         # copy important fields from updated
-        for key in ["intent", "repository_query", "candidate_schemes", "ranked_schemes", "selected_scheme", "planner_output", "verification_output", "final_response", "messages", "metadata", "errors", "current_node", "next_node"]:
+        for key in [
+            "intent",
+            "repository_query",
+            "candidate_schemes",
+            "eligible_schemes",
+            "eligibility_decisions",
+            "ranked_schemes",
+            "selected_scheme",
+            "planner_output",
+            "verification_output",
+            "final_response",
+            "messages",
+            "metadata",
+            "errors",
+            "current_node",
+            "next_node",
+        ]:
             if hasattr(updated, key):
                 setattr(merged, key, getattr(updated, key))
 

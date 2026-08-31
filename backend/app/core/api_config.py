@@ -23,6 +23,8 @@ class ApiConfig:
 	timeout_seconds: float = 15.0
 	debug: bool = False
 	maximum_execution_time_seconds: float = 30.0
+	llm_max_tokens: dict[str, int] | None = None
+	require_verification: bool = False
 	max_payload_bytes: int = 1_048_576
 	supported_versions: tuple[str, ...] = ("v1", "v2")
 
@@ -43,6 +45,8 @@ def _coerce_config(raw: dict[str, Any]) -> ApiConfig:
 		timeout_seconds=float(raw.get("timeout_seconds", raw.get("timeout", 15.0))),
 		debug=bool(raw.get("debug", False)),
 		maximum_execution_time_seconds=float(raw.get("maximum_execution_time_seconds", 30.0)),
+		llm_max_tokens={str(key): int(value) for key, value in raw.get("llm_max_tokens", {}).items()},
+		require_verification=bool(raw.get("require_verification", False)),
 		max_payload_bytes=int(raw.get("max_payload_bytes", 1_048_576)),
 		supported_versions=supported_versions,
 	)
