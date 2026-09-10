@@ -9,13 +9,16 @@ import {
   Compass,
   CheckCircle2,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { LanguageSelector } from './LanguageSelector';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useAppStore } from '../../store/appStore';
 
 export const Footer: React.FC = () => {
   const { t } = useTranslation();
+  const { startTour } = useAppStore();
 
   return (
     <footer className="bg-slate-900 text-slate-300 border-t border-slate-800">
@@ -118,7 +121,17 @@ export const Footer: React.FC = () => {
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
               <li>
-                <Link to="/survey" className="hover:text-white transition-colors text-emerald-400 font-medium">
+                <button
+                  type="button"
+                  onClick={startTour}
+                  className="hover:text-emerald-300 transition-colors text-emerald-400 font-bold inline-flex items-center gap-1.5 cursor-pointer text-left"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Interactive Tour ✨</span>
+                </button>
+              </li>
+              <li>
+                <Link to="/survey" className="hover:text-white transition-colors text-slate-300 font-medium">
                   → Eligibility Survey
                 </Link>
               </li>

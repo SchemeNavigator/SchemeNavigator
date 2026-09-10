@@ -4,6 +4,7 @@ import { Navbar } from '../components/common/Navbar';
 import { Footer } from '../components/common/Footer';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 import { ChatbotFAB } from '../components/common/ChatbotFAB';
+import { OnboardingTour } from '../components/common/OnboardingTour';
 
 export const RootLayout: React.FC = () => {
   const location = useLocation();
@@ -31,6 +32,9 @@ export const RootLayout: React.FC = () => {
 
       {/* Floating AI Advisor Chatbot Button */}
       <ChatbotFAB />
+
+      {/* Interactive Onboarding Tour & Welcome Screen Window */}
+      <OnboardingTour />
     </div>
   );
 };

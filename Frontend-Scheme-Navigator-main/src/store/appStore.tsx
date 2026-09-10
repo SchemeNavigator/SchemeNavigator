@@ -23,6 +23,7 @@ export interface AppState {
   savedSchemeIds: string[];
   applications: TrackerItem[];
   selectedLanguage: LanguageInfo;
+  isTourActive: boolean;
   loading: boolean;
   error: string | null;
 
@@ -36,6 +37,8 @@ export interface AppState {
   setSelectedScheme: (scheme: Scheme | null) => void;
   setSelectedLanguage: (lang: LanguageInfo | string) => void;
   handleCheckEligibility: (navigate: (path: string) => void) => void;
+  startTour: () => void;
+  stopTour: () => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -70,8 +73,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return TOP_INDIAN_LANGUAGES[0];
   });
+  const [isTourActive, setIsTourActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const startTour = useCallback(() => {
+    setIsTourActive(true);
+  }, []);
+
+  const stopTour = useCallback(() => {
+    setIsTourActive(false);
+  }, []);
 
   const setSelectedLanguage = (lang: LanguageInfo | string) => {
     const target = typeof lang === 'string' ? getLanguageByCode(lang) : lang;
@@ -180,6 +192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         savedSchemeIds,
         applications,
         selectedLanguage,
+        isTourActive,
         loading,
         error,
         setProfile,
@@ -191,6 +204,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedScheme,
         setSelectedLanguage,
         handleCheckEligibility,
+        startTour,
+        stopTour,
       }}
     >
       {children}

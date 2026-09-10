@@ -15,7 +15,7 @@ import { LanguageSelector } from './LanguageSelector';
 
 export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { savedSchemeIds, handleCheckEligibility } = useAppStore();
+  const { savedSchemeIds, handleCheckEligibility, startTour } = useAppStore();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,6 +65,7 @@ export const Navbar: React.FC = () => {
             </NavLink>
 
             <NavLink
+              id="nav-explore"
               to="/explore"
               className={({ isActive }) =>
                 `px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
@@ -77,6 +78,20 @@ export const Navbar: React.FC = () => {
               {t('nav.explore')}
             </NavLink>
 
+            <NavLink
+              id="nav-track-schemes"
+              to="/dashboard"
+              className={({ isActive }) =>
+                `px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  isActive
+                    ? 'text-teal-900 bg-slate-100'
+                    : 'text-slate-700 hover:text-slate-950 hover:bg-slate-50'
+                }`
+              }
+            >
+              Dashboard & Tracker
+            </NavLink>
+
             <a
               href="#how-it-works"
               onClick={handleHowItWorksClick}
@@ -86,6 +101,7 @@ export const Navbar: React.FC = () => {
             </a>
 
             <NavLink
+              id="nav-ai-advisor"
               to="/assistant"
               className={({ isActive }) =>
                 `px-3.5 py-2 rounded-xl text-sm font-semibold transition-all text-teal-800 bg-teal-50 hover:bg-teal-100 flex items-center gap-1.5 font-bold ${
@@ -113,11 +129,23 @@ export const Navbar: React.FC = () => {
 
           {/* Right Action Icons & CTA */}
           <div className="hidden md:flex items-center space-x-2.5">
+            {/* Interactive Tour Button */}
+            <button
+              type="button"
+              onClick={startTour}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200/80 transition-all cursor-pointer shadow-2xs"
+              title="Take interactive product tour"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              <span>Tour</span>
+            </button>
+
             {/* Language Selector Dropdown */}
             <LanguageSelector variant="navbar" align="right" />
 
             {/* Bookmarks Icon */}
             <Link
+              id="nav-saved-schemes"
               to="/dashboard"
               className="relative p-2.5 text-slate-700 hover:text-teal-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               title={t('nav.savedSchemes')}
@@ -132,6 +160,7 @@ export const Navbar: React.FC = () => {
 
             {/* Check Eligibility CTA */}
             <button
+              id="nav-check-eligibility"
               type="button"
               onClick={() => handleCheckEligibility(navigate)}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-700 to-teal-900 hover:from-teal-800 hover:to-teal-950 text-white text-sm font-bold rounded-xl shadow-sm shadow-teal-900/20 hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
@@ -261,6 +290,21 @@ export const Navbar: React.FC = () => {
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </NavLink>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                startTour();
+              }}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-base font-semibold text-teal-800 bg-teal-50 hover:bg-teal-100 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-teal-600" />
+                <span>Take Interactive Tour ✨</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-teal-500" />
+            </button>
 
             {/* Mobile Language Switcher Row */}
             <div className="px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
