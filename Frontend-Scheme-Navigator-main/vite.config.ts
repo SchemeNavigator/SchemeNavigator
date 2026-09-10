@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/Frontend-Scheme-Navigator/',
+  base: './',
   plugins: [
     react(),
     tailwindcss(),
