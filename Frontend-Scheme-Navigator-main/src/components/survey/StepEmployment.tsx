@@ -1,0 +1,197 @@
+import React from 'react';
+import { UserProfile, EmploymentType } from '../../types';
+import { EMPLOYMENT_TYPES } from '../../constants';
+import {
+  GraduationCap,
+  Sprout,
+  Briefcase,
+  UserCheck,
+  Search,
+  Wrench,
+  Home,
+  ShieldAlert,
+  Sparkles,
+  Building,
+  User,
+} from 'lucide-react';
+import { VoiceMicButton } from './VoiceMicButton';
+
+interface StepEmploymentProps {
+  profile: UserProfile;
+  onChange: (fields: Partial<UserProfile>) => void;
+  onOpenVoice?: () => void;
+}
+
+const OCCUPATION_OPTIONS = [
+  'Student',
+  'Farmer',
+  'Teacher',
+  'Engineer',
+  'Doctor',
+  'Business Owner',
+  'Shopkeeper',
+  'Daily Wage Worker',
+  'Government Employee',
+  'Private Employee',
+  'Driver',
+  'Construction Worker',
+  'Healthcare Worker',
+  'Homemaker',
+  'Retired',
+  'Unemployed',
+  'Other',
+];
+
+export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChange, onOpenVoice }) => {
+  const getEmploymentIcon = (type: EmploymentType) => {
+    switch (type) {
+      case 'Student':
+        return <GraduationCap className="w-5 h-5 text-blue-600" />;
+      case 'Farmer':
+        return <Sprout className="w-5 h-5 text-emerald-600" />;
+      case 'Business owner':
+        return <Briefcase className="w-5 h-5 text-indigo-600" />;
+      case 'Employed':
+        return <UserCheck className="w-5 h-5 text-teal-600" />;
+      case 'Unemployed':
+        return <Search className="w-5 h-5 text-amber-600" />;
+      case 'Self-employed':
+        return <Wrench className="w-5 h-5 text-cyan-600" />;
+      case 'Homemaker':
+        return <Home className="w-5 h-5 text-rose-600" />;
+      case 'Retired':
+        return <ShieldAlert className="w-5 h-5 text-purple-600" />;
+      default:
+        return <Sparkles className="w-5 h-5 text-slate-600" />;
+    }
+  };
+
+  const currentEmpStatus = (profile.employmentStatus || profile.employmentType || 'Student') as EmploymentType;
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-200">
+      <div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
+            Step 4 of 6 • Occupation & Livelihood
+          </span>
+          {onOpenVoice && (
+            <VoiceMicButton
+              onClick={onOpenVoice}
+              variant="pill"
+              label="Speak"
+              sublabel="बोलें"
+            />
+          )}
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+          Employment Status & Occupation
+        </h2>
+        <p className="text-sm text-slate-600 mt-1">
+          Government departments create specialized schemes tailored to specific professional and livelihood groups.
+        </p>
+      </div>
+
+      {/* Main Employment Status Grid */}
+      <div className="space-y-3">
+        <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+          Employment Status <span className="text-rose-500">*</span>
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {EMPLOYMENT_TYPES.map((type) => {
+            const isSelected = currentEmpStatus === type;
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() =>
+                  onChange({
+                    employmentStatus: type,
+                    employmentType: type,
+                    occupation: profile.occupation || type,
+                  })
+                }
+                className={`p-4 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  isSelected
+                    ? 'border-teal-600 bg-teal-50/80 shadow-md ring-2 ring-teal-500/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 rounded-xl bg-slate-100">{getEmploymentIcon(type)}</div>
+                  <div
+                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      isSelected ? 'border-teal-700 bg-teal-700' : 'border-slate-300'
+                    }`}
+                  >
+                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                </div>
+                <span className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-teal-950' : 'text-slate-800'}`}>
+                  {type}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* If Employed: Ask Government / Private */}
+      {currentEmpStatus === 'Employed' && (
+        <div className="p-5 rounded-2xl bg-teal-50/70 border border-teal-200/80 space-y-3 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 text-xs font-bold text-teal-900 uppercase tracking-wider">
+            <Building className="w-4 h-4 text-teal-700" />
+            <span>Employment Sector</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { id: 'GOVERNMENT', label: 'Government / Public Sector', desc: 'Central / State Govt / PSU' },
+              { id: 'PRIVATE', label: 'Private Sector', desc: 'Corporate / Pvt Ltd / MSME employee' },
+            ].map((sector) => {
+              const isSelected = profile.employmentType === sector.id || profile.employmentType === sector.id.toLowerCase();
+              return (
+                <button
+                  key={sector.id}
+                  type="button"
+                  onClick={() => onChange({ employmentType: sector.id as any })}
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
+                      : 'bg-white text-slate-700 border-teal-200 hover:bg-teal-100/50'
+                  }`}
+                >
+                  <div className="text-xs font-bold">{sector.label}</div>
+                  <p className={`text-[11px] mt-0.5 ${isSelected ? 'text-teal-200' : 'text-slate-500'}`}>
+                    {sector.desc}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Specific Occupation Dropdown (Single Select) */}
+      <div className="space-y-2">
+        <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+          Specific Occupation <span className="text-rose-500">*</span>
+        </label>
+        <div className="relative">
+          <User className="absolute left-4 top-3.5 w-5 h-5 text-teal-700" />
+          <select
+            value={profile.occupation || currentEmpStatus || 'Student'}
+            onChange={(e) => onChange({ occupation: e.target.value })}
+            className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border border-slate-300 focus:border-teal-600 focus:bg-white rounded-2xl text-slate-900 text-sm font-semibold outline-hidden transition-all appearance-none cursor-pointer"
+          >
+            {OCCUPATION_OPTIONS.map((occ) => (
+              <option key={occ} value={occ}>
+                {occ}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-4 pointer-events-none text-slate-400">▼</div>
+        </div>
+      </div>
+    </div>
+  );
+};

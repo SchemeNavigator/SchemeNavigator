@@ -1,0 +1,88 @@
+import React from 'react';
+import { Scheme, UserProfile } from '../../types';
+import { calculateSchemeMatch } from '../../services/matchingEngine';
+import { Sparkles, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+interface ExplainabilityBoxProps {
+  scheme: Scheme;
+  userProfile: UserProfile | null;
+}
+
+export const ExplainabilityBox: React.FC<ExplainabilityBoxProps> = ({
+  scheme,
+  userProfile,
+}) => {
+  if (!userProfile) {
+    return (
+      <div className="rounded-3xl bg-gradient-to-br from-teal-900 via-teal-950 to-slate-950 text-white p-6 sm:p-8 border border-teal-800/40 shadow-lg space-y-4">
+        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+          <Sparkles className="w-4 h-4" />
+          <span>Personalized Match Explainability</span>
+        </div>
+        <h3 className="text-xl font-bold text-white">
+          Want to know if this scheme applies directly to you?
+        </h3>
+        <p className="text-xs sm:text-sm text-teal-100/80 leading-relaxed">
+          Complete our quick 2-minute eligibility survey to get an exact match breakdown, verified document checklist, and step-by-step guidance.
+        </p>
+        <Link
+          to="/survey"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition-all"
+        >
+          <span>Calculate My Personal Match</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    );
+  }
+
+  const match = calculateSchemeMatch(scheme, userProfile);
+
+  return (
+    <div className="rounded-3xl bg-gradient-to-br from-teal-900 via-teal-950 to-slate-950 text-white p-6 sm:p-8 border border-teal-800/40 shadow-lg space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-teal-800/60 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-teal-800 border border-teal-600 flex items-center justify-center text-emerald-300">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-extrabold text-white">
+              Why SchemeNavigator Recommended This
+            </h3>
+            <span className="text-xs text-teal-200">
+              Transparent explanation based on your active profile
+            </span>
+          </div>
+        </div>
+
+        <div className="px-3.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+          {match.matchScore}% Profile Compatibility
+        </div>
+      </div>
+
+      {/* Matched Reasons List */}
+      <div className="space-y-2.5">
+        {match.matchedReasons.map((reason, idx) => (
+          <div key={idx} className="flex items-start gap-2.5 text-xs text-teal-50">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{reason}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Warnings / Exclusions if any */}
+      {match.unmatchedWarnings.length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-800/60 text-xs text-amber-200 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <span className="leading-relaxed">{match.unmatchedWarnings[0]}</span>
+        </div>
+      )}
+
+      {/* Disclaimer */}
+      <div className="pt-2 text-[11px] text-teal-300/60 leading-relaxed border-t border-teal-800/40">
+        Note: The compatibility score is computed deterministically against publicly notified scheme guidelines. Final admission and disbursement decisions rest solely with the administrative authority.
+      </div>
+    </div>
+  );
+};
