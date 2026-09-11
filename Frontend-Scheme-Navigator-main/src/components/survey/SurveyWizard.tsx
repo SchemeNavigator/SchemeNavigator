@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserProfile } from '../../types';
 import { getSavedProfile } from '../../services/storageService';
@@ -9,7 +9,7 @@ import { StepLocation } from './StepLocation';
 import { StepBackground } from './StepBackground';
 import { StepEmployment } from './StepEmployment';
 import { StepIncome } from './StepIncome';
-import { StepReview } from './StepReview';
+import { StepReview, getMissingMandatoryFields } from './StepReview';
 import { VoiceSurveyModal } from './VoiceSurveyModal';
 import { VoiceMicButton } from './VoiceMicButton';
 import { LanguageSelector } from '../common/LanguageSelector';
@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Compass,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 
 export const SurveyWizard: React.FC = () => {
@@ -37,12 +38,6 @@ export const SurveyWizard: React.FC = () => {
     text: string;
     entities: ParsedEntity[];
   } | null>(null);
-
-  useEffect(() => {
-    if (storeProfile && storeProfile.age) {
-      setProfile((prev) => ({ ...prev, ...storeProfile }));
-    }
-  }, [storeProfile]);
 
   const totalSteps = 6;
 
@@ -80,14 +75,59 @@ export const SurveyWizard: React.FC = () => {
     }, 5000);
   };
 
+  const [stepError, setStepError] = useState<string | null>(null);
+
   const handleNext = async () => {
+    setStepError(null);
+
+    // Step 1 Validation
+    if (currentStep === 1) {
+      if (!profile.age || Number(profile.age) < 1 || Number(profile.age) > 120) {
+        setStepError('⚠️ Age is mandatory (1–120 years). Please enter your age to discover matching schemes.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (!profile.gender) {
+        setStepError('⚠️ Gender is mandatory. Please select your gender to check scheme eligibility.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    // Step 2 Validation
+    if (currentStep === 2) {
+      if (!profile.state) {
+        setStepError('⚠️ State / UT is mandatory. Please select your State to view applicable welfare schemes.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    // Step 4 Validation
+    if (currentStep === 4) {
+      if (!profile.employmentStatus && !profile.employmentType && !profile.occupation) {
+        setStepError('⚠️ Occupation / Employment status is mandatory. Please select your primary occupation.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
     if (currentStep < totalSteps) {
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       saveDraft(profile, nextStep);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // Step 6: Review Confirmed -> Transactionally Submit
+      // Step 6: Review & Confirmation -> Validate ALL Mandatory Fields before submitting
+      const missing = getMissingMandatoryFields(profile);
+      if (missing.length > 0) {
+        setStepError(
+          `⚠️ Mandatory Profile Fields Missing: Please fill ${missing.map((m) => m.label).join(', ')} before submitting to find eligible schemes.`
+        );
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       try {
         await submitSurvey(profile);
       } catch (err) {
@@ -98,6 +138,7 @@ export const SurveyWizard: React.FC = () => {
   };
 
   const handlePrev = () => {
+    setStepError(null);
     if (currentStep > 1) {
       const prevStep = currentStep - 1;
       setCurrentStep(prevStep);
@@ -106,7 +147,36 @@ export const SurveyWizard: React.FC = () => {
     }
   };
 
+  const handleStepClick = (targetStep: number) => {
+    setStepError(null);
+    if (targetStep <= currentStep) {
+      // Going back or staying on current step is always allowed
+      setCurrentStep(targetStep);
+      saveDraft(profile, targetStep);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Check mandatory fields for all steps before targetStep
+    const missing = getMissingMandatoryFields(profile);
+    const missingBeforeTarget = missing.filter((m) => m.step < targetStep);
+
+    if (missingBeforeTarget.length > 0) {
+      setStepError(
+        `⚠️ Mandatory fields missing: Please complete Step ${missingBeforeTarget[0].step} (${missingBeforeTarget[0].label}) before proceeding to Step ${targetStep}.`
+      );
+      setCurrentStep(missingBeforeTarget[0].step);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setCurrentStep(targetStep);
+    saveDraft(profile, targetStep);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleEditStep = (stepNumber: number) => {
+    setStepError(null);
     setCurrentStep(stepNumber);
     saveDraft(profile, stepNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -120,12 +190,12 @@ export const SurveyWizard: React.FC = () => {
       {/* Wizard Header with Progress Bar */}
       <div className="mb-8 space-y-4">
         {/* Step Indicator Top Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-teal-800 text-white flex items-center justify-center font-bold text-[11px]">
               {currentStep}
             </span>
-            <span className="text-slate-900 uppercase tracking-wider">
+            <span className="text-slate-900 dark:text-white uppercase tracking-wider">
               Step {currentStep} of {totalSteps}: {stepTitles[currentStep - 1]}
             </span>
           </div>
@@ -142,7 +212,7 @@ export const SurveyWizard: React.FC = () => {
         </div>
 
         {/* Continuous Progress Bar */}
-        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-teal-600 to-emerald-500 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progressPercent}%` }}
@@ -160,23 +230,23 @@ export const SurveyWizard: React.FC = () => {
               <button
                 key={title}
                 type="button"
-                onClick={() => setCurrentStep(stepNum)}
+                onClick={() => handleStepClick(stepNum)}
                 className={`flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                   isCurrent
-                    ? 'text-teal-900 font-bold'
+                    ? 'text-teal-900 dark:text-teal-400 font-bold'
                     : isCompleted
-                    ? 'text-emerald-700 hover:text-emerald-900'
-                    : 'text-slate-600 hover:text-slate-800'
+                    ? 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
                 {isCompleted ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 ) : (
                   <span
                     className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center ${
                       isCurrent
                         ? 'bg-teal-800 text-white font-bold'
-                        : 'bg-slate-200 text-slate-600'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
                     {stepNum}
@@ -230,8 +300,32 @@ export const SurveyWizard: React.FC = () => {
         </div>
       )}
 
+      {/* Prominent Red Step Validation Error Alert */}
+      {stepError && (
+        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-rose-50 border-2 border-rose-500 shadow-md shadow-rose-500/10 text-rose-950 flex items-start justify-between gap-3 animate-in slide-in-from-top-2">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+            <div className="space-y-1">
+              <span className="text-xs sm:text-sm font-extrabold text-rose-900 block">
+                Action Required
+              </span>
+              <p className="text-xs sm:text-sm font-semibold text-rose-800 leading-snug">
+                {stepError}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStepError(null)}
+            className="text-rose-600 hover:text-rose-900 font-extrabold text-sm px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Main Survey Card Container */}
-      <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-xl shadow-slate-200/60 transition-all">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/60 dark:shadow-none transition-all">
         {currentStep === 1 && (
           <StepPersonal
             profile={profile}
@@ -272,12 +366,12 @@ export const SurveyWizard: React.FC = () => {
         )}
 
         {/* Wizard Footer Navigation Actions */}
-        <div className="mt-10 pt-6 border-t border-slate-100 flex items-center justify-between gap-4">
+        <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handlePrev}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold text-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-sm transition-all cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>{t('survey.back')}</span>

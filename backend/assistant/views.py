@@ -35,8 +35,8 @@ class AssistantMessagesView(APIView):
 class AssistantChatView(APIView):
     """
     POST /api/assistant/chat/
-    Body: { "message": "<user text>" }
-    Returns: { "answer": str, "referencedSchemes": Scheme[] }
+    Body: { "message": "<user text>", "history": [...], "profile": {...} }
+    Returns: { "answer": str, "referencedSchemes": Scheme[], "profileUpdated": bool }
     """
 
     def post(self, request):
@@ -45,16 +45,19 @@ class AssistantChatView(APIView):
         if not message:
             return Response({"error": "message is required"}, status=400)
 
-        # Single-turn call — no history, no profile stored on the server.
+        history = request.data.get("history", [])
+        profile = request.data.get("profile", None)
+
         agent = AssistantAgent()
         result = agent.chat(
-            history=[],
+            history=history,
             message=message,
-            current_profile=None,
+            current_profile=profile,
         )
 
         answer = result["answer"]
         referenced_ids = result.get("referenced_scheme_ids", [])
+        updated_profile = result.get("updated_profile")
 
         # Hydrate referenced scheme objects
         referenced_schemes = []
@@ -66,6 +69,8 @@ class AssistantChatView(APIView):
             {
                 "answer": answer,
                 "referencedSchemes": referenced_schemes,
-                "profileUpdated": False,
+                "profileUpdated": bool(updated_profile),
+                "updatedProfile": updated_profile,
             }
         )
+

@@ -11,3 +11,4 @@ pandas==2.3.3
 dj-database-url==2.3.0
 gunicorn==23.0.0
 redis==5.2.1
+requests>=2.31.0

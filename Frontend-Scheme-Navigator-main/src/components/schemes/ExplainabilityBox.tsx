@@ -3,6 +3,7 @@ import { Scheme, UserProfile } from '../../types';
 import { calculateSchemeMatch } from '../../services/matchingEngine';
 import { Sparkles, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface ExplainabilityBoxProps {
   scheme: Scheme;
@@ -13,24 +14,26 @@ export const ExplainabilityBox: React.FC<ExplainabilityBoxProps> = ({
   scheme,
   userProfile,
 }) => {
+  const { t } = useTranslation();
+
   if (!userProfile) {
     return (
       <div className="rounded-3xl bg-gradient-to-br from-teal-900 via-teal-950 to-slate-950 text-white p-6 sm:p-8 border border-teal-800/40 shadow-lg space-y-4">
         <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
           <Sparkles className="w-4 h-4" />
-          <span>Personalized Match Explainability</span>
+          <span>{t('scheme_detail.explainability_badge', undefined, 'Personalized Match Explainability')}</span>
         </div>
         <h3 className="text-xl font-bold text-white">
-          Want to know if this scheme applies directly to you?
+          {t('scheme_detail.explainability_prompt_title', undefined, 'Want to know if this scheme applies directly to you?')}
         </h3>
         <p className="text-xs sm:text-sm text-teal-100/80 leading-relaxed">
-          Complete our quick 2-minute eligibility survey to get an exact match breakdown, verified document checklist, and step-by-step guidance.
+          {t('scheme_detail.explainability_prompt_desc', undefined, 'Complete our quick 2-minute eligibility survey to get an exact match breakdown, verified document checklist, and step-by-step guidance.')}
         </p>
         <Link
           to="/survey"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition-all"
         >
-          <span>Calculate My Personal Match</span>
+          <span>{t('scheme_detail.calculate_match_btn', undefined, 'Calculate My Personal Match')}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -48,16 +51,16 @@ export const ExplainabilityBox: React.FC<ExplainabilityBoxProps> = ({
           </div>
           <div>
             <h3 className="text-base sm:text-lg font-extrabold text-white">
-              Why SchemeNavigator Recommended This
+              {t('scheme_detail.why_recommended_title', undefined, 'Why SchemeNavigator Recommended This')}
             </h3>
             <span className="text-xs text-teal-200">
-              Transparent explanation based on your active profile
+              {t('scheme_detail.why_recommended_subtitle', undefined, 'Transparent explanation based on your active profile')}
             </span>
           </div>
         </div>
 
         <div className="px-3.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
-          {match.matchScore}% Profile Compatibility
+          {match.matchScore}% {t('scheme_detail.compatibility_badge', undefined, 'Profile Compatibility')}
         </div>
       </div>
 
@@ -81,7 +84,7 @@ export const ExplainabilityBox: React.FC<ExplainabilityBoxProps> = ({
 
       {/* Disclaimer */}
       <div className="pt-2 text-[11px] text-teal-300/60 leading-relaxed border-t border-teal-800/40">
-        Note: The compatibility score is computed deterministically against publicly notified scheme guidelines. Final admission and disbursement decisions rest solely with the administrative authority.
+        {t('scheme_detail.compatibility_note', undefined, 'Note: The compatibility score is computed deterministically against publicly notified scheme guidelines. Final admission and disbursement decisions rest solely with the administrative authority.')}
       </div>
     </div>
   );

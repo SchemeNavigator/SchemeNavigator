@@ -1,40 +1,42 @@
-/**
- * storageService — in-memory only.
- *
- * All user data (profile, saved schemes, tracker items, auth state) is held
- * purely in module-level variables.  Nothing is written to sessionStorage or
- * localStorage.  All data is gone the moment the page is closed or refreshed.
- */
+import { UserProfile, TrackerItem, ApplicationStatus, SchemeCategory, Scheme } from '../types';
 
-import { UserProfile, TrackerItem, ApplicationStatus, SchemeCategory } from '../types';
+const STORAGE_KEYS = {
+  PROFILE: 'sn_user_profile_v2',
+  SAVED_SCHEMES: 'sn_saved_schemes_v2',
+  SAVED_SCHEME_OBJS: 'sn_saved_scheme_objs_v2',
+  TRACKER: 'sn_tracker_items_v2',
+  AUTH: 'sn_auth_user_v2',
+};
 
-// Clear any previously persisted data left by older versions of this app.
-(function clearLegacyStorage() {
+// Safe helper to read JSON from localStorage
+function readFromStorage<T>(key: string, fallback: T): T {
   try {
-    const keys = [
-      'sn_user_profile',
-      'sn_saved_schemes',
-      'sn_tracker_items',
-      'sn_auth_user',
-      'sn_recent_searches',
-      'sn_survey_draft',
-      'sn_session_token',
-    ];
-    keys.forEach((k) => {
-      localStorage.removeItem(k);
-      sessionStorage.removeItem(k);
-    });
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      return JSON.parse(raw);
+    }
   } catch {
-    // ignore — storage may be blocked in some environments
+    // fallback
   }
-})();
+  return fallback;
+}
 
-// ── In-memory store ──────────────────────────────────────────────────────────
+// Safe helper to write JSON to localStorage
+function writeToStorage(key: string, value: any): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage errors
+  }
+}
 
-let _profile: UserProfile | null = null;
-let _savedSchemeIds: string[] = [];
-let _trackerItems: TrackerItem[] = [];
-let _authUser: AuthUser | null = null;
+// ── In-memory & Persistent Store ─────────────────────────────────────────────
+
+let _profile: UserProfile | null = readFromStorage<UserProfile | null>(STORAGE_KEYS.PROFILE, null);
+let _savedSchemeIds: string[] = readFromStorage<string[]>(STORAGE_KEYS.SAVED_SCHEMES, []);
+let _savedSchemes: Scheme[] = readFromStorage<Scheme[]>(STORAGE_KEYS.SAVED_SCHEME_OBJS, []);
+let _trackerItems: TrackerItem[] = readFromStorage<TrackerItem[]>(STORAGE_KEYS.TRACKER, []);
+let _authUser: AuthUser | null = readFromStorage<AuthUser | null>(STORAGE_KEYS.AUTH, null);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,36 +69,81 @@ export const DEFAULT_DEMO_PROFILE: UserProfile = {
 // ── User Profile ─────────────────────────────────────────────────────────────
 
 export function getSavedProfile(): UserProfile | null {
+  if (!_profile) {
+    _profile = readFromStorage<UserProfile | null>(STORAGE_KEYS.PROFILE, null);
+  }
   return _profile;
 }
 
 export function saveUserProfile(profile: UserProfile): void {
   _profile = { ...profile, completedAt: new Date().toISOString() };
+  writeToStorage(STORAGE_KEYS.PROFILE, _profile);
   window.dispatchEvent(new Event('sn_profile_updated'));
 }
 
 export function clearUserProfile(): void {
   _profile = null;
+  try {
+    localStorage.removeItem(STORAGE_KEYS.PROFILE);
+  } catch {
+    // ignore
+  }
   window.dispatchEvent(new Event('sn_profile_updated'));
+}
+
+export function calculateProfileCompletion(profile: UserProfile | null): number {
+  if (!profile) return 0;
+  let score = 0;
+  if (profile.age !== undefined && profile.age !== '') score += 15;
+  if (profile.gender) score += 15;
+  if (profile.state) score += 15;
+  if (profile.areaType || profile.residenceArea) score += 10;
+  if (profile.employmentType || profile.occupation || profile.employmentStatus) score += 15;
+  if (profile.category) score += 15;
+  if (profile.incomeRange || profile.annualIncome !== undefined) score += 15;
+
+  return Math.min(100, Math.max(0, score));
 }
 
 // ── Saved Schemes ─────────────────────────────────────────────────────────────
 
 export function getSavedSchemeIds(): string[] {
+  _savedSchemeIds = readFromStorage<string[]>(STORAGE_KEYS.SAVED_SCHEMES, []);
   return [..._savedSchemeIds];
 }
 
-export function isSchemeSaved(schemeId: string): boolean {
-  return _savedSchemeIds.includes(schemeId);
+export function getSavedSchemes(): Scheme[] {
+  _savedSchemes = readFromStorage<Scheme[]>(STORAGE_KEYS.SAVED_SCHEME_OBJS, []);
+  return [..._savedSchemes];
 }
 
-export function toggleSaveScheme(schemeId: string): boolean {
-  if (_savedSchemeIds.includes(schemeId)) {
-    _savedSchemeIds = _savedSchemeIds.filter((id) => id !== schemeId);
+export function isSchemeSaved(schemeId: string): boolean {
+  return getSavedSchemeIds().includes(schemeId);
+}
+
+export function toggleSaveScheme(schemeOrId: string | Scheme, schemeObj?: Scheme): boolean {
+  const schemeId = typeof schemeOrId === 'string' ? schemeOrId : schemeOrId.id;
+  const targetObj = typeof schemeOrId === 'object' ? schemeOrId : schemeObj;
+
+  const currentIds = getSavedSchemeIds();
+  const currentObjs = readFromStorage<Scheme[]>(STORAGE_KEYS.SAVED_SCHEME_OBJS, []);
+
+  if (currentIds.includes(schemeId)) {
+    _savedSchemeIds = currentIds.filter((id) => id !== schemeId);
+    _savedSchemes = currentObjs.filter((s) => s.id !== schemeId && s.slug !== schemeId);
+    writeToStorage(STORAGE_KEYS.SAVED_SCHEMES, _savedSchemeIds);
+    writeToStorage(STORAGE_KEYS.SAVED_SCHEME_OBJS, _savedSchemes);
     window.dispatchEvent(new Event('sn_saved_updated'));
     return false;
   } else {
-    _savedSchemeIds = [..._savedSchemeIds, schemeId];
+    _savedSchemeIds = [...currentIds, schemeId];
+    if (targetObj) {
+      _savedSchemes = [targetObj, ...currentObjs.filter((s) => s.id !== schemeId && s.slug !== schemeId)];
+    } else {
+      _savedSchemes = currentObjs;
+    }
+    writeToStorage(STORAGE_KEYS.SAVED_SCHEMES, _savedSchemeIds);
+    writeToStorage(STORAGE_KEYS.SAVED_SCHEME_OBJS, _savedSchemes);
     window.dispatchEvent(new Event('sn_saved_updated'));
     return true;
   }
@@ -105,7 +152,85 @@ export function toggleSaveScheme(schemeId: string): boolean {
 // ── Application Guidance Tracker ─────────────────────────────────────────────
 
 export function getTrackerItems(): TrackerItem[] {
+  _trackerItems = readFromStorage<TrackerItem[]>(STORAGE_KEYS.TRACKER, []);
+  
+  // Auto-repair missing fields or 'undefined' names from saved schemes store
+  const saved = readFromStorage<Scheme[]>(STORAGE_KEYS.SAVED_SCHEME_OBJS, []);
+  let hasRepaired = false;
+  
+  _trackerItems = _trackerItems.map((item) => {
+    if (
+      !item.schemeName ||
+      item.schemeName === 'undefined' ||
+      item.schemeName === 'Unknown Scheme' ||
+      !item.category
+    ) {
+      const match = saved.find((s) => s.id === item.schemeId || s.slug === item.schemeId);
+      if (match) {
+        hasRepaired = true;
+        const officialUrl =
+          match.verification?.officialPortalUrl ||
+          (match as any)?.applicationUrl ||
+          (match as any)?.officialWebsite;
+        return {
+          ...item,
+          schemeName: match.name || item.schemeName,
+          category: match.category || item.category || ('Social Welfare' as SchemeCategory),
+          level: match.level || item.level || 'Central',
+          shortDescription: match.shortDescription || (match as any)?.description || item.shortDescription,
+          officialPortalUrl: officialUrl || item.officialPortalUrl,
+          totalDocumentsCount: match.documents?.length || item.totalDocumentsCount,
+        };
+      }
+    }
+    return item;
+  });
+
+  if (hasRepaired) {
+    writeToStorage(STORAGE_KEYS.TRACKER, _trackerItems);
+  }
+
   return [..._trackerItems];
+}
+
+export function addSchemeToTracker(
+  scheme: Scheme,
+  status: ApplicationStatus = 'Exploring',
+  notes?: string
+): void {
+  const schemeId = scheme.id || scheme.slug;
+  if (!schemeId) return;
+
+  const current = getTrackerItems();
+  const existingIndex = current.findIndex((i) => i.schemeId === schemeId);
+  const officialPortalUrl =
+    scheme.verification?.officialPortalUrl ||
+    (scheme as any)?.applicationUrl ||
+    (scheme as any)?.officialWebsite;
+
+  const itemData: TrackerItem = {
+    id: existingIndex >= 0 ? current[existingIndex].id : 'tr-' + Date.now(),
+    schemeId,
+    schemeName: scheme.name || (existingIndex >= 0 ? current[existingIndex].schemeName : 'Scheme'),
+    category: scheme.category || (existingIndex >= 0 ? current[existingIndex].category : ('Social Welfare' as SchemeCategory)),
+    level: scheme.level || (existingIndex >= 0 ? current[existingIndex].level : 'Central'),
+    shortDescription: scheme.shortDescription || (scheme as any)?.description || (existingIndex >= 0 ? current[existingIndex].shortDescription : undefined),
+    officialPortalUrl: officialPortalUrl || (existingIndex >= 0 ? current[existingIndex].officialPortalUrl : undefined),
+    status: existingIndex >= 0 ? current[existingIndex].status : status,
+    notes: notes || (existingIndex >= 0 ? current[existingIndex].notes : 'Started exploring scheme guidance.'),
+    preparedDocuments: existingIndex >= 0 ? current[existingIndex].preparedDocuments : [],
+    totalDocumentsCount: scheme.documents?.length || (existingIndex >= 0 ? current[existingIndex].totalDocumentsCount : undefined),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (existingIndex >= 0) {
+    _trackerItems = current.map((item, idx) => (idx === existingIndex ? { ...item, ...itemData } : item));
+  } else {
+    _trackerItems = [itemData, ...current];
+  }
+
+  writeToStorage(STORAGE_KEYS.TRACKER, _trackerItems);
+  window.dispatchEvent(new Event('sn_tracker_updated'));
 }
 
 export function updateTrackerStatus(
@@ -115,13 +240,16 @@ export function updateTrackerStatus(
   status: ApplicationStatus,
   notes?: string
 ): void {
-  const existingIndex = _trackerItems.findIndex((i) => i.schemeId === schemeId);
+  const current = getTrackerItems();
+  const existingIndex = current.findIndex((i) => i.schemeId === schemeId);
 
   if (existingIndex >= 0) {
-    _trackerItems = _trackerItems.map((item, idx) =>
+    _trackerItems = current.map((item, idx) =>
       idx === existingIndex
         ? {
             ...item,
+            schemeName: schemeName && schemeName !== 'undefined' ? schemeName : item.schemeName,
+            category: category || item.category,
             status,
             notes: notes ?? item.notes,
             updatedAt: new Date().toISOString(),
@@ -133,48 +261,65 @@ export function updateTrackerStatus(
       {
         id: 'tr-' + Date.now(),
         schemeId,
-        schemeName,
-        category,
+        schemeName: schemeName || 'Scheme',
+        category: category || ('Social Welfare' as SchemeCategory),
         status,
         notes: notes || 'Started exploring scheme guidance.',
         preparedDocuments: [],
         updatedAt: new Date().toISOString(),
       },
-      ..._trackerItems,
+      ...current,
     ];
   }
 
+  writeToStorage(STORAGE_KEYS.TRACKER, _trackerItems);
   window.dispatchEvent(new Event('sn_tracker_updated'));
 }
 
 export function removeTrackerItem(schemeId: string): void {
-  _trackerItems = _trackerItems.filter((i) => i.schemeId !== schemeId);
+  const current = getTrackerItems();
+  _trackerItems = current.filter((i) => i.schemeId !== schemeId);
+  writeToStorage(STORAGE_KEYS.TRACKER, _trackerItems);
   window.dispatchEvent(new Event('sn_tracker_updated'));
 }
 
 export function saveTrackerItem(item: TrackerItem): void {
-  const existingIndex = _trackerItems.findIndex((i) => i.schemeId === item.schemeId);
+  const current = getTrackerItems();
+  const existingIndex = current.findIndex((i) => i.schemeId === item.schemeId);
   if (existingIndex >= 0) {
-    _trackerItems = _trackerItems.map((t, idx) =>
+    _trackerItems = current.map((t, idx) =>
       idx === existingIndex ? { ...item, updatedAt: new Date().toISOString() } : t
     );
   } else {
     _trackerItems = [
       { ...item, id: item.id || 'tr-' + Date.now(), updatedAt: new Date().toISOString() },
-      ..._trackerItems,
+      ...current,
     ];
   }
+  writeToStorage(STORAGE_KEYS.TRACKER, _trackerItems);
   window.dispatchEvent(new Event('sn_tracker_updated'));
 }
 
 // ── Auth State ────────────────────────────────────────────────────────────────
 
 export function getAuthUser(): AuthUser | null {
+  if (!_authUser) {
+    _authUser = readFromStorage<AuthUser | null>(STORAGE_KEYS.AUTH, null);
+  }
   return _authUser;
 }
 
 export function setAuthUser(user: AuthUser | null): void {
   _authUser = user;
+  if (user) {
+    writeToStorage(STORAGE_KEYS.AUTH, user);
+  } else {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.AUTH);
+    } catch {
+      // ignore
+    }
+  }
   window.dispatchEvent(new Event('sn_auth_updated'));
 }
 

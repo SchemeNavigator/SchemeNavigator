@@ -21,7 +21,7 @@ SECRET_KEY = os.environ.get(
     "SECRET_KEY",
     "django-insecure-change-me-in-production-please",
 )
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,*").split(",")
 
 # ---------------------------------------------------------------------------
 # Application definition
@@ -93,20 +93,31 @@ DATABASES = {
 }
 
 # ---------------------------------------------------------------------------
-# Cache (Redis)
+# Cache
 # ---------------------------------------------------------------------------
+# Use instant in-memory cache for local dev / default; Redis if USE_REDIS=true
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+USE_REDIS = os.environ.get("USE_REDIS", "false").lower() == "true"
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "IGNORE_EXCEPTIONS": True,  # graceful degradation if Redis is down
-        },
+if USE_REDIS:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "IGNORE_EXCEPTIONS": True,
+            },
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "scheme-navigator-fast-cache",
+        }
+    }
+
 
 # ---------------------------------------------------------------------------
 # Static files
@@ -166,6 +177,12 @@ LITELLM_API_BASE = os.environ.get("LITELLM_API_BASE", "")  # e.g. https://openro
 LITELLM_MODEL = os.environ.get("LITELLM_MODEL", "gpt-4o-mini")
 LITELLM_TEMPERATURE = float(os.environ.get("LITELLM_TEMPERATURE", "0.3"))
 LITELLM_MAX_TOKENS = int(os.environ.get("LITELLM_MAX_TOKENS", "1024"))
+
+# ---------------------------------------------------------------------------
+# Government Scheme API Integration
+# ---------------------------------------------------------------------------
+GOVT_SCHEME_API_URL = os.environ.get("GOVT_SCHEME_API_URL", "")
+GOVT_SCHEME_API_KEY = os.environ.get("GOVT_SCHEME_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Celery

@@ -161,6 +161,8 @@ export interface SchemeMatchResult {
   scheme: Scheme;
   matchScore: number; // 0 - 100
   matchGrade: 'High Potential' | 'Good Match' | 'Moderate Match' | 'General Match';
+  whyGood?: string;
+  toNote?: string;
   matchedReasons: string[];
   unmatchedWarnings: string[];
   factors: MatchFactor[];
@@ -178,9 +180,13 @@ export interface TrackerItem {
   schemeId: string;
   schemeName: string;
   category: SchemeCategory;
+  level?: 'Central' | 'State';
+  shortDescription?: string;
+  officialPortalUrl?: string;
   status: ApplicationStatus;
   notes?: string;
   preparedDocuments: string[];
+  totalDocumentsCount?: number;
   externalApplicationDate?: string;
   updatedAt: string;
 }

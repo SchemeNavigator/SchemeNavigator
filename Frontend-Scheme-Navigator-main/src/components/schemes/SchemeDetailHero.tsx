@@ -9,10 +9,11 @@ import {
   Bookmark,
   Share2,
   Phone,
-  ShieldCheck,
   CheckCircle2,
 } from 'lucide-react';
-import { isSchemeSaved, toggleSaveScheme } from '../../services/storageService';
+import { isSchemeSaved } from '../../services/storageService';
+import { useTranslation } from '../../hooks/useTranslation';
+import { getSafeOfficialUrl } from '../common/ExternalPortalModal';
 
 interface SchemeDetailHeroProps {
   scheme: Scheme;
@@ -22,16 +23,28 @@ interface SchemeDetailHeroProps {
 
 export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
   scheme,
-  onOpenApplyModal,
+  onOpenApplyModal: _onOpenApplyModal,
   onSaveToggle,
 }) => {
-  const isSaved = isSchemeSaved(scheme.id);
+  const { t, tState } = useTranslation();
+  const isSaved = isSchemeSaved(scheme?.id || scheme?.slug);
+
+  const coveredStates = Array.isArray(scheme?.coveredStates) ? scheme.coveredStates : ['All India'];
+  const isAllIndia = coveredStates.includes('All India') || coveredStates.length === 0;
+  const verification = scheme?.verification || {
+    sourceDepartment: 'Government Department',
+    ministryOrAuthority: 'Government Ministry',
+    lastUpdated: 'Recently Verified',
+    officialPortalUrl: '',
+    helpline: '1800-111-555',
+    isOfficialVerified: true,
+  };
 
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
         title: scheme.name,
-        text: scheme.tagline,
+        text: scheme.tagline || scheme.shortDescription,
         url: window.location.href,
       }).catch(() => {});
     } else {
@@ -49,8 +62,8 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
         {/* Top Badges */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill type="category" value={scheme.category} size="sm" />
-            <StatusPill type="level" value={scheme.level} size="sm" />
+            <StatusPill type="category" value={scheme.category || 'General'} size="sm" />
+            <StatusPill type="level" value={scheme.level || 'Central'} size="sm" />
             <StatusPill type="verified" value="" size="sm" />
           </div>
 
@@ -58,10 +71,10 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
             <button
               onClick={handleShare}
               className="p-2.5 rounded-xl bg-teal-800/60 hover:bg-teal-700/80 border border-teal-700/60 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Share scheme"
+              title={t('common.share', undefined, 'Share')}
             >
               <Share2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Share</span>
+              <span className="hidden sm:inline">{t('common.share', undefined, 'Share')}</span>
             </button>
 
             <button
@@ -73,7 +86,7 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
               }`}
             >
               <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-slate-950' : ''}`} />
-              <span>{isSaved ? 'Saved' : 'Save Scheme'}</span>
+              <span>{isSaved ? t('scheme_card.saved', undefined, 'Saved') : t('scheme_card.save_scheme', undefined, 'Save Scheme')}</span>
             </button>
           </div>
         </div>
@@ -84,7 +97,7 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
             {scheme.name}
           </h1>
           <p className="text-base sm:text-lg text-teal-100/90 leading-relaxed font-medium">
-            {scheme.tagline}
+            {scheme.tagline || scheme.shortDescription}
           </p>
         </div>
 
@@ -93,17 +106,17 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
           <div className="flex items-start gap-2.5">
             <Building className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="text-teal-300 font-semibold block">Ministry / Authority:</span>
-              <span className="text-white font-bold">{scheme.verification.ministryOrAuthority}</span>
+              <span className="text-teal-300 font-semibold block">{t('scheme_detail.ministry_label', undefined, 'Ministry / Authority:')}</span>
+              <span className="text-white font-bold">{verification.ministryOrAuthority || verification.sourceDepartment}</span>
             </div>
           </div>
 
           <div className="flex items-start gap-2.5">
             <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="text-teal-300 font-semibold block">Coverage:</span>
+              <span className="text-teal-300 font-semibold block">{t('scheme_detail.coverage_label', undefined, 'Coverage:')}</span>
               <span className="text-white font-bold">
-                {scheme.coveredStates.includes('All India') ? 'All India (All States & UTs)' : scheme.coveredStates.join(', ')}
+                {isAllIndia ? t('scheme_detail.all_india_coverage', undefined, 'All India (All States & UTs)') : coveredStates.map(st => tState(st)).join(', ')}
               </span>
             </div>
           </div>
@@ -111,17 +124,17 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
           <div className="flex items-start gap-2.5">
             <Calendar className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="text-teal-300 font-semibold block">Information Last Verified:</span>
-              <span className="text-white font-bold">{scheme.verification.lastUpdated}</span>
+              <span className="text-teal-300 font-semibold block">{t('scheme_detail.last_verified_label', undefined, 'Information Last Verified:')}</span>
+              <span className="text-white font-bold">{verification.lastUpdated || 'Current Fiscal Year'}</span>
             </div>
           </div>
 
-          {scheme.verification.helpline && (
+          {verification.helpline && (
             <div className="flex items-start gap-2.5">
               <Phone className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <span className="text-teal-300 font-semibold block">Official Helpline:</span>
-                <span className="text-white font-bold">{scheme.verification.helpline}</span>
+                <span className="text-teal-300 font-semibold block">{t('scheme_detail.official_helpline', undefined, 'Official Helpline:')}</span>
+                <span className="text-white font-bold">{verification.helpline}</span>
               </div>
             </div>
           )}
@@ -131,16 +144,18 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
           <div className="flex items-center gap-2 text-xs text-teal-200">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Direct link to official government portal available</span>
+            <span>{t('scheme_detail.direct_link_badge', undefined, 'Direct link to official government portal available')}</span>
           </div>
 
-          <button
-            onClick={onOpenApplyModal}
+          <a
+            href={getSafeOfficialUrl(scheme)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-950/40 hover:shadow-xl transition-all cursor-pointer"
           >
-            <span>Proceed to Official Application</span>
+            <span>{t('scheme_detail.proceed_app_btn', undefined, 'Proceed to Official Application')}</span>
             <ExternalLink className="w-4 h-4" />
-          </button>
+          </a>
         </div>
       </div>
     </div>

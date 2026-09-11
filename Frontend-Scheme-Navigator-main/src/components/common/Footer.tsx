@@ -17,7 +17,7 @@ import { useTranslation } from '../../hooks/useTranslation';
 import { useAppStore } from '../../store/appStore';
 
 export const Footer: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, tp } = useTranslation();
   const { startTour } = useAppStore();
 
   return (
@@ -52,21 +52,21 @@ export const Footer: React.FC = () => {
               </span>
             </div>
             <p className="text-sm text-slate-400 leading-relaxed pr-4">
-              Your Guide to Government Schemes, Simplified. Discover public welfare schemes you may qualify for, understand required conditions in simple terms, and apply directly via official portals.
+              {t('footer.brandDesc')}
             </p>
 
             <div className="flex flex-wrap gap-2 pt-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-[11px] text-emerald-400 border border-slate-700">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                100% Free & Open
+                {t('stats.free')}
               </span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-[11px] text-teal-400 border border-slate-700">
                 <Lock className="w-3.5 h-3.5" />
-                Privacy First
+                {t('trust.privacyFirst')}
               </span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-[11px] text-blue-400 border border-slate-700">
                 <ExternalLink className="w-3.5 h-3.5" />
-                Official Portals Only
+                {t('stats.direct')}
               </span>
             </div>
           </div>
@@ -74,41 +74,41 @@ export const Footer: React.FC = () => {
           {/* Col 2: Popular Categories */}
           <div>
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-              <span>Categories</span>
+              <span>{t('footer.categories')}</span>
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
               <li>
                 <Link to="/explore?category=Education" className="hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Education & Scholarships</span>
+                  <span>{tp('Education')}</span>
                 </Link>
               </li>
               <li>
                 <Link to="/explore?category=Agriculture" className="hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <Sprout className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Agriculture & Farming</span>
+                  <span>{tp('Agriculture')}</span>
                 </Link>
               </li>
               <li>
                 <Link to="/explore?category=Business" className="hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>MSME & Business Loans</span>
+                  <span>{tp('Business')}</span>
                 </Link>
               </li>
               <li>
                 <Link to="/explore?category=Women%20%26%20Child" className="hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <HeartHandshake className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Women & Child Welfare</span>
+                  <span>{tp('Women & Child')}</span>
                 </Link>
               </li>
               <li>
                 <Link to="/explore?category=Healthcare" className="hover:text-emerald-400 transition-colors">
-                  Healthcare & Insurance
+                  {tp('Healthcare')}
                 </Link>
               </li>
               <li>
                 <Link to="/explore?category=Social%20Security" className="hover:text-emerald-400 transition-colors">
-                  Pensions & Social Security
+                  {tp('Social Security')}
                 </Link>
               </li>
             </ul>
@@ -117,7 +117,7 @@ export const Footer: React.FC = () => {
           {/* Col 3: Navigation */}
           <div>
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-              Platform
+              {t('footer.platform')}
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
               <li>
@@ -127,32 +127,32 @@ export const Footer: React.FC = () => {
                   className="hover:text-emerald-300 transition-colors text-emerald-400 font-bold inline-flex items-center gap-1.5 cursor-pointer text-left"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Interactive Tour ✨</span>
+                  <span>{t('nav.tour')} ✨</span>
                 </button>
               </li>
               <li>
                 <Link to="/survey" className="hover:text-white transition-colors text-slate-300 font-medium">
-                  → Eligibility Survey
+                  → {t('nav.checkEligibility')}
                 </Link>
               </li>
               <li>
                 <Link to="/explore" className="hover:text-white transition-colors">
-                  Explore All Schemes
+                  {t('nav.explore')}
                 </Link>
               </li>
               <li>
                 <Link to="/how-it-works" className="hover:text-white transition-colors">
-                  How It Works
+                  {t('nav.howItWorks')}
                 </Link>
               </li>
               <li>
                 <Link to="/assistant" className="hover:text-white transition-colors">
-                  AI Scheme Advisor
+                  {t('nav.aiAdvisor')}
                 </Link>
               </li>
               <li>
                 <Link to="/dashboard" className="hover:text-white transition-colors">
-                  User Dashboard & Tracker
+                  {t('nav.dashboard')}
                 </Link>
               </li>
             </ul>
@@ -161,27 +161,27 @@ export const Footer: React.FC = () => {
           {/* Col 4: Trust & Transparency */}
           <div>
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-              Transparency
+              {t('footer.transparency')}
             </h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
               <li>
                 <Link to="/about" className="hover:text-white transition-colors">
-                  About SchemeNavigator
+                  {t('about.title')}
                 </Link>
               </li>
               <li>
                 <Link to="/privacy" className="hover:text-white transition-colors">
-                  Privacy Policy
+                  {t('privacy.title')}
                 </Link>
               </li>
               <li>
                 <Link to="/terms" className="hover:text-white transition-colors">
-                  Terms & Disclaimers
+                  {t('terms.title')}
                 </Link>
               </li>
               <li>
                 <Link to="/about#what-we-are-not" className="hover:text-white transition-colors">
-                  What We Are Not
+                  {t('footer.transparency')}
                 </Link>
               </li>
             </ul>
@@ -194,9 +194,8 @@ export const Footer: React.FC = () => {
             <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-slate-200 block mb-1">
-                Official Disclaimer & Independent Navigation Status:
+                {t('footer.disclaimer')}
               </span>
-              SchemeNavigator is an independent informational discovery and guidance platform designed to help citizens explore public welfare initiatives. SchemeNavigator is <strong>not an official government department, agency, or ministry</strong> and does not make final eligibility determinations, approve applications, or disburse benefits. All applications and final verifications are executed exclusively on respective official government web portals (.gov.in / .nic.in).
             </div>
           </div>
         </div>
@@ -204,16 +203,16 @@ export const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="mt-8 pt-8 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
           <div>
-            © {new Date().getFullYear()} SchemeNavigator. Built for empowering Indian citizens with clear scheme discovery.
+            © {new Date().getFullYear()} SchemeNavigator. {t('footer.copyright')}
           </div>
           <div className="flex items-center space-x-4">
             <LanguageSelector variant="footer" align="right" />
             <span>•</span>
-            <Link to="/privacy" className="hover:text-slate-300">Privacy</Link>
+            <Link to="/privacy" className="hover:text-slate-300">{t('privacy.title')}</Link>
             <span>•</span>
-            <Link to="/terms" className="hover:text-slate-300">Terms</Link>
+            <Link to="/terms" className="hover:text-slate-300">{t('terms.title')}</Link>
             <span>•</span>
-            <Link to="/about" className="hover:text-slate-300">About</Link>
+            <Link to="/about" className="hover:text-slate-300">{t('nav.about')}</Link>
           </div>
         </div>
       </div>

@@ -14,6 +14,7 @@ import { AssistantPage } from './pages/AssistantPage';
 import { AboutPage } from './pages/AboutPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export function App() {
   useEffect(() => {
@@ -21,27 +22,29 @@ export function App() {
   }, []);
 
   return (
-    <AppProvider>
-      <HashRouter>
-        <Routes>
-          <Route element={<RootLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/how-it-works" element={<HomePage />} />
-            <Route path="/survey" element={<SurveyPage />} />
-            <Route path="/analyzing" element={<AnalyzingPage />} />
-            <Route path="/recommendations" element={<RecommendationsPage />} />
-            <Route path="/schemes/:id" element={<SchemeDetailPage />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/assistant" element={<AssistantPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/terms" element={<TermsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </HashRouter>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <HashRouter>
+          <Routes>
+            <Route element={<RootLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/how-it-works" element={<HomePage />} />
+              <Route path="/survey" element={<SurveyPage />} />
+              <Route path="/analyzing" element={<AnalyzingPage />} />
+              <Route path="/recommendations" element={<RecommendationsPage />} />
+              <Route path="/schemes/:id" element={<SchemeDetailPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/assistant" element={<AssistantPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </HashRouter>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 

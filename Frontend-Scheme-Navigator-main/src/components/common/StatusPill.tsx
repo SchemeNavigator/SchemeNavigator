@@ -14,6 +14,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import { useTranslation } from '../../hooks/useTranslation';
+
 interface StatusPillProps {
   type: 'category' | 'status' | 'level' | 'verified';
   value: string;
@@ -27,13 +29,14 @@ export const StatusPill: React.FC<StatusPillProps> = ({
   className = '',
   size = 'md',
 }) => {
+  const { tp } = useTranslation();
   const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs';
 
   if (type === 'verified') {
     return (
-      <span className={`inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300/80 rounded-full shadow-2xs ${sizeClasses} ${className}`}>
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-        <span>Verified Department Info</span>
+      <span className={`inline-flex items-center gap-1 font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300/80 dark:border-emerald-800 rounded-full shadow-2xs ${sizeClasses} ${className}`}>
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+        <span>{tp('Verified Information')}</span>
       </span>
     );
   }
@@ -44,12 +47,12 @@ export const StatusPill: React.FC<StatusPillProps> = ({
       <span
         className={`inline-flex items-center gap-1 font-semibold rounded-full border ${sizeClasses} ${
           isCentral
-            ? 'bg-blue-50 text-blue-800 border-blue-200'
-            : 'bg-purple-50 text-purple-800 border-purple-200'
+            ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+            : 'bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
         } ${className}`}
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${isCentral ? 'bg-blue-600' : 'bg-purple-600'}`} />
-        <span>{value} Scheme</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${isCentral ? 'bg-blue-600 dark:bg-blue-400' : 'bg-purple-600 dark:bg-purple-400'}`} />
+        <span>{tp(value)}</span>
       </span>
     );
   }
@@ -58,23 +61,23 @@ export const StatusPill: React.FC<StatusPillProps> = ({
     const getStatusStyle = (st: string) => {
       switch (st as ApplicationStatus) {
         case 'Completed':
-          return 'bg-emerald-50 text-emerald-800 border-emerald-300';
+          return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
         case 'Applied Externally':
-          return 'bg-blue-50 text-blue-800 border-blue-300';
+          return 'bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-800';
         case 'Ready to Apply':
-          return 'bg-teal-50 text-teal-800 border-teal-300';
+          return 'bg-teal-50 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-800';
         case 'Documents Needed':
-          return 'bg-amber-50 text-amber-800 border-amber-300';
+          return 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800';
         case 'Exploring':
         default:
-          return 'bg-slate-100 text-slate-700 border-slate-300';
+          return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700';
       }
     };
 
     return (
       <span className={`inline-flex items-center gap-1.5 font-medium rounded-full border ${getStatusStyle(value)} ${sizeClasses} ${className}`}>
         <span className="w-2 h-2 rounded-full bg-current opacity-80" />
-        <span>{value}</span>
+        <span>{tp(value)}</span>
       </span>
     );
   }
@@ -83,51 +86,51 @@ export const StatusPill: React.FC<StatusPillProps> = ({
   const getCategoryIcon = (cat: SchemeCategory) => {
     switch (cat) {
       case 'Education':
-        return <GraduationCap className="w-3.5 h-3.5 text-blue-700" />;
+        return <GraduationCap className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" />;
       case 'Agriculture':
-        return <Sprout className="w-3.5 h-3.5 text-emerald-700" />;
+        return <Sprout className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />;
       case 'Business':
-        return <Briefcase className="w-3.5 h-3.5 text-indigo-700" />;
+        return <Briefcase className="w-3.5 h-3.5 text-indigo-700 dark:text-indigo-400" />;
       case 'Women & Child':
-        return <HeartHandshake className="w-3.5 h-3.5 text-rose-700" />;
+        return <HeartHandshake className="w-3.5 h-3.5 text-rose-700 dark:text-rose-400" />;
       case 'Employment':
-        return <UserCheck className="w-3.5 h-3.5 text-teal-700" />;
+        return <UserCheck className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />;
       case 'Housing':
-        return <Home className="w-3.5 h-3.5 text-amber-700" />;
+        return <Home className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />;
       case 'Healthcare':
-        return <ShieldPlus className="w-3.5 h-3.5 text-red-700" />;
+        return <ShieldPlus className="w-3.5 h-3.5 text-red-700 dark:text-red-400" />;
       case 'Social Security':
-        return <Users className="w-3.5 h-3.5 text-purple-700" />;
+        return <Users className="w-3.5 h-3.5 text-purple-700 dark:text-purple-400" />;
       case 'Skill Development':
-        return <Lightbulb className="w-3.5 h-3.5 text-cyan-700" />;
+        return <Lightbulb className="w-3.5 h-3.5 text-cyan-700 dark:text-cyan-400" />;
       case 'Financial Assistance':
       default:
-        return <Coins className="w-3.5 h-3.5 text-yellow-700" />;
+        return <Coins className="w-3.5 h-3.5 text-yellow-700 dark:text-yellow-400" />;
     }
   };
 
   const getCategoryBg = (cat: string) => {
     switch (cat) {
       case 'Education':
-        return 'bg-blue-50/90 text-blue-900 border-blue-200';
+        return 'bg-blue-50/90 dark:bg-blue-950/60 text-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800';
       case 'Agriculture':
-        return 'bg-emerald-50/90 text-emerald-900 border-emerald-200';
+        return 'bg-emerald-50/90 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
       case 'Business':
-        return 'bg-indigo-50/90 text-indigo-900 border-indigo-200';
+        return 'bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800';
       case 'Women & Child':
-        return 'bg-rose-50/90 text-rose-900 border-rose-200';
+        return 'bg-rose-50/90 dark:bg-rose-950/60 text-rose-900 dark:text-rose-300 border-rose-200 dark:border-rose-800';
       case 'Employment':
-        return 'bg-teal-50/90 text-teal-900 border-teal-200';
+        return 'bg-teal-50/90 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 border-teal-200 dark:border-teal-800';
       case 'Housing':
-        return 'bg-amber-50/90 text-amber-900 border-amber-200';
+        return 'bg-amber-50/90 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-200 dark:border-amber-800';
       case 'Healthcare':
-        return 'bg-red-50/90 text-red-900 border-red-200';
+        return 'bg-red-50/90 dark:bg-red-950/60 text-red-900 dark:text-red-300 border-red-200 dark:border-red-800';
       case 'Social Security':
-        return 'bg-purple-50/90 text-purple-900 border-purple-200';
+        return 'bg-purple-50/90 dark:bg-purple-950/60 text-purple-900 dark:text-purple-300 border-purple-200 dark:border-purple-800';
       case 'Skill Development':
-        return 'bg-cyan-50/90 text-cyan-900 border-cyan-200';
+        return 'bg-cyan-50/90 dark:bg-cyan-950/60 text-cyan-900 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800';
       default:
-        return 'bg-slate-100 text-slate-800 border-slate-200';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700';
     }
   };
 
@@ -138,7 +141,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({
       )} ${sizeClasses} ${className}`}
     >
       {getCategoryIcon(value as SchemeCategory)}
-      <span>{value}</span>
+      <span>{tp(value)}</span>
     </span>
   );
 };

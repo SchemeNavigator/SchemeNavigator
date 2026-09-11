@@ -50,11 +50,10 @@ class SchemeListView(APIView):
             qs = qs.filter(category__iexact=params["category"])
 
         if params["state"] and params["state"] != "All India":
-            # covered_states is a JSON array; filter via contains
-            # Matches schemes where covered_states contains 'All India' OR the given state
+            # Filter schemes where covered_states includes the state or 'All India'
             qs = qs.filter(
-                Q(covered_states__contains=["All India"])
-                | Q(covered_states__contains=[params["state"]])
+                Q(covered_states__icontains=params["state"])
+                | Q(covered_states__icontains="All India")
             )
 
         if params["search"]:
@@ -81,8 +80,17 @@ class SchemeListView(APIView):
 
         total_pages = math.ceil(total / limit) if limit > 0 else 1
 
+        # Fetch or cache category counts summary
+        category_counts = cache.get("schemes:category_counts")
+        if category_counts is None:
+            from django.db.models import Count
+            raw_counts = Scheme.objects.values("category").annotate(count=Count("id"))
+            category_counts = {item["category"]: item["count"] for item in raw_counts if item["category"]}
+            cache.set("schemes:category_counts", category_counts, 60 * 30)
+
         result = {
             "schemes": serializer.data,
+            "categoryCounts": category_counts,
             "pagination": {
                 "page": page,
                 "limit": limit,
@@ -98,7 +106,7 @@ class SchemeListView(APIView):
 class SchemeDetailView(APIView):
     """
     GET /api/schemes/<id_or_slug>/
-    Accepts both the database pk (int) and the slug string.
+    Accepts both the database pk (int), exact slug, case-insensitive slug, or name.
     """
 
     authentication_classes = []
@@ -110,14 +118,27 @@ class SchemeDetailView(APIView):
         if cached is not None:
             return Response(cached)
 
-        # Try slug first, then integer pk
+        # 1. Try exact slug
         scheme = Scheme.objects.filter(slug=id_or_slug).first()
+        # 2. Try case-insensitive slug
+        if scheme is None:
+            scheme = Scheme.objects.filter(slug__iexact=id_or_slug).first()
+        # 3. Try integer pk
         if scheme is None:
             try:
                 scheme = Scheme.objects.get(pk=int(id_or_slug))
             except (ValueError, Scheme.DoesNotExist):
-                from rest_framework.exceptions import NotFound
-                raise NotFound(f"Scheme '{id_or_slug}' not found.")
+                pass
+        # 4. Try slug icontains or name match
+        if scheme is None:
+            scheme = Scheme.objects.filter(slug__icontains=id_or_slug).first()
+        if scheme is None:
+            clean_term = id_or_slug.replace("-", " ")
+            scheme = Scheme.objects.filter(name__icontains=clean_term).first()
+
+        if scheme is None:
+            from rest_framework.exceptions import NotFound
+            raise NotFound(f"Scheme '{id_or_slug}' not found.")
 
         data = SchemeSerializer(scheme).data
         cache.set(cache_key, data, CACHE_TTL)

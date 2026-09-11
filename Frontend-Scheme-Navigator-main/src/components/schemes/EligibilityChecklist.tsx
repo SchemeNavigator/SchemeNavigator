@@ -1,7 +1,8 @@
 import React from 'react';
 import { Scheme, UserProfile } from '../../types';
 import { formatIncomeInLakh } from '../../utils/formatIndianNumber';
-import { CheckCircle2, AlertCircle, HelpCircle, Check, Info } from 'lucide-react';
+import { AlertCircle, Check, Info } from 'lucide-react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface EligibilityChecklistProps {
   scheme: Scheme;
@@ -12,7 +13,8 @@ export const EligibilityChecklist: React.FC<EligibilityChecklistProps> = ({
   scheme,
   userProfile,
 }) => {
-  const { eligibility } = scheme;
+  const { t, tState, tOccupation } = useTranslation();
+  const eligibility = scheme?.eligibility || {};
 
   // Build conditions checklist
   const criteriaList: { title: string; desc: string; isMatched: boolean; userValue?: string }[] = [];
@@ -24,58 +26,62 @@ export const EligibilityChecklist: React.FC<EligibilityChecklistProps> = ({
   const ageMatched = userAge === null || (userAge >= minAge && userAge <= maxAge);
 
   criteriaList.push({
-    title: 'Age Eligibility',
-    desc: `Applicant must fall within ${minAge} to ${maxAge} years.`,
+    title: t('scheme_detail.age_eligibility_title', undefined, 'Age Eligibility'),
+    desc: `${t('scheme_detail.age_desc_prefix', undefined, 'Applicant must fall within')} ${minAge} ${t('scheme_detail.to', undefined, 'to')} ${maxAge} ${t('common.years', undefined, 'years')}.`,
     isMatched: ageMatched,
-    userValue: userAge !== null ? `Your age: ${userAge} yrs` : undefined,
+    userValue: userAge !== null ? `${t('scheme_detail.your_age', undefined, 'Your age:')} ${userAge} ${t('common.yrs', undefined, 'yrs')}` : undefined,
   });
 
   // Location condition
-  const isAllIndia = scheme.coveredStates.includes('All India');
+  const coveredStates = Array.isArray(scheme?.coveredStates) ? scheme.coveredStates : ['All India'];
+  const isAllIndia = coveredStates.includes('All India') || coveredStates.length === 0;
   const userState = userProfile?.state;
-  const stateMatched = isAllIndia || (userState ? scheme.coveredStates.includes(userState) : true);
+  const stateMatched = isAllIndia || (userState ? coveredStates.includes(userState) : true);
 
   criteriaList.push({
-    title: 'State & Territory Coverage',
+    title: t('scheme_detail.territory_coverage_title', undefined, 'State & Territory Coverage'),
     desc: isAllIndia
-      ? 'Open to eligible citizens residing across all Indian states and Union Territories.'
-      : `Restricted to permanent residents / domiciles of ${scheme.coveredStates.join(', ')}.`,
+      ? t('scheme_detail.territory_all_india', undefined, 'Open to eligible citizens residing across all Indian states and Union Territories.')
+      : `${t('scheme_detail.territory_restricted', undefined, 'Restricted to permanent residents / domiciles of')} ${coveredStates.map(st => tState(st)).join(', ')}.`,
     isMatched: stateMatched,
-    userValue: userState ? `Your location: ${userState}` : undefined,
+    userValue: userState ? `${t('scheme_detail.your_location', undefined, 'Your location:')} ${tState(userState)}` : undefined,
   });
 
   // Occupation condition
-  if (eligibility.allowedOccupations && eligibility.allowedOccupations.length > 0) {
+  const allowedOccupations = Array.isArray(eligibility.allowedOccupations) ? eligibility.allowedOccupations : [];
+  if (allowedOccupations.length > 0 && !allowedOccupations.includes('All' as any)) {
     const userOcc = userProfile?.employmentType;
-    const occMatched = !userOcc || eligibility.allowedOccupations.includes(userOcc as any);
-
+    const occMatched = !userOcc || allowedOccupations.includes(userOcc as any);
 
     criteriaList.push({
-      title: 'Target Occupation / Category',
-      desc: `Open to: ${eligibility.allowedOccupations.join(', ')}.`,
+      title: t('scheme_detail.target_occupation_title', undefined, 'Target Occupation / Category'),
+      desc: `${t('scheme_detail.open_to', undefined, 'Open to:')} ${allowedOccupations.map(occ => tOccupation(occ)).join(', ')}.`,
       isMatched: occMatched,
-      userValue: userOcc ? `Your occupation: ${userOcc}` : undefined,
+      userValue: userOcc ? `${t('scheme_detail.your_occupation', undefined, 'Your occupation:')} ${tOccupation(userOcc)}` : undefined,
     });
   }
 
   // Income condition
   if (eligibility.maxAnnualIncome && eligibility.maxAnnualIncome > 0) {
     criteriaList.push({
-      title: 'Annual Income Ceiling',
-      desc: `Gross household annual income must not exceed ${formatIncomeInLakh(eligibility.maxAnnualIncome)} per annum.`,
+      title: t('scheme_detail.income_ceiling_title', undefined, 'Annual Income Ceiling'),
+      desc: `${t('scheme_detail.income_ceiling_desc', undefined, 'Gross household annual income must not exceed')} ${formatIncomeInLakh(eligibility.maxAnnualIncome)} ${t('scheme_detail.per_annum', undefined, 'per annum.')}`,
       isMatched: true,
-      userValue: userProfile?.incomeRange ? `Your income bracket: ${userProfile.incomeRange}` : undefined,
+      userValue: userProfile?.incomeRange ? `${t('scheme_detail.your_income_bracket', undefined, 'Your income bracket:')} ${userProfile.incomeRange}` : undefined,
     });
   }
 
   // Custom conditions
-  if (eligibility.customConditions) {
-    eligibility.customConditions.forEach((c) => {
-      criteriaList.push({
-        title: 'Statutory Guideline',
-        desc: c,
-        isMatched: true,
-      });
+  const customConditions = Array.isArray(eligibility.customConditions) ? eligibility.customConditions : [];
+  if (customConditions.length > 0) {
+    customConditions.forEach((c) => {
+      if (typeof c === 'string' && c.trim()) {
+        criteriaList.push({
+          title: t('scheme_detail.statutory_guideline', undefined, 'Statutory Guideline'),
+          desc: c,
+          isMatched: true,
+        });
+      }
     });
   }
 
@@ -84,16 +90,16 @@ export const EligibilityChecklist: React.FC<EligibilityChecklistProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-xl font-bold text-slate-900">
-            Who May Qualify? (Eligibility Criteria)
+            {t('scheme_detail.eligibility_title', undefined, 'Who May Qualify? (Eligibility Criteria)')}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Verified conditions extracted from official government scheme gazettes.
+            {t('scheme_detail.eligibility_subtitle', undefined, 'Verified conditions extracted from official government scheme gazettes.')}
           </p>
         </div>
 
         {userProfile && (
           <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 text-xs font-semibold self-start sm:self-auto">
-            Live Profile Calibration
+            {t('scheme_detail.live_calibration', undefined, 'Live Profile Calibration')}
           </span>
         )}
       </div>
@@ -140,7 +146,7 @@ export const EligibilityChecklist: React.FC<EligibilityChecklistProps> = ({
 
       <div className="p-3.5 rounded-xl bg-slate-100/70 text-[11px] text-slate-500 flex items-center gap-2">
         <Info className="w-4 h-4 text-slate-400 shrink-0" />
-        <span>Official verifications may require uploading income, caste, or domicile certificates during final application on the government portal.</span>
+        <span>{t('scheme_detail.eligibility_disclaimer', undefined, 'Official verifications may require uploading income, caste, or domicile certificates during final application on the government portal.')}</span>
       </div>
     </div>
   );

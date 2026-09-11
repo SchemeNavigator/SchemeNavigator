@@ -1,17 +1,19 @@
 import { Scheme, UserProfile, SchemeMatchResult, MatchFactor } from '../types';
-import { ALL_SCHEMES } from '../data/allSchemes';
 
 export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): SchemeMatchResult {
   const factors: MatchFactor[] = [];
   const matchedReasons: string[] = [];
   const unmatchedWarnings: string[] = [];
 
+  const eligibility = scheme?.eligibility || {};
+  const coveredStates = Array.isArray(scheme?.coveredStates) ? scheme.coveredStates : ['All India'];
+
   let totalScore = 0;
-  const userAge = typeof profile.age === 'number' ? profile.age : null;
+  const userAge = typeof profile?.age === 'number' ? profile.age : null;
 
   // 1. AGE FACTOR (Weight: 20)
-  const minAge = scheme.eligibility.minAge ?? 0;
-  const maxAge = scheme.eligibility.maxAge ?? 100;
+  const minAge = eligibility.minAge ?? 0;
+  const maxAge = eligibility.maxAge ?? 100;
 
   if (userAge !== null) {
     if (userAge >= minAge && userAge <= maxAge) {
@@ -49,8 +51,8 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
   }
 
   // 2. STATE / LOCATION FACTOR (Weight: 20)
-  const isAllIndia = scheme.coveredStates.includes('All India');
-  const userState = profile.state;
+  const isAllIndia = coveredStates.includes('All India') || coveredStates.length === 0;
+  const userState = profile?.state;
 
   if (isAllIndia) {
     totalScore += 20;
@@ -62,7 +64,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
       weight: 20,
       score: 20,
     });
-  } else if (userState && scheme.coveredStates.includes(userState)) {
+  } else if (userState && coveredStates.includes(userState)) {
     totalScore += 20;
     matchedReasons.push(`State-specific scheme actively active in ${userState}`);
     factors.push({
@@ -73,11 +75,11 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
       score: 20,
     });
   } else if (userState) {
-    unmatchedWarnings.push(`This scheme is specific to ${scheme.coveredStates.join(', ')} (your state is ${userState}).`);
+    unmatchedWarnings.push(`This scheme is specific to ${coveredStates.join(', ')} (your state is ${userState}).`);
     factors.push({
       criterion: 'State / Location',
       status: 'mismatch',
-      explanation: `Restricted to residents of ${scheme.coveredStates.join(', ')}.`,
+      explanation: `Restricted to residents of ${coveredStates.join(', ')}.`,
       weight: 20,
       score: 0,
     });
@@ -86,17 +88,17 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
     factors.push({
       criterion: 'State / Location',
       status: 'neutral',
-      explanation: `Valid in ${scheme.coveredStates.join(', ')}.`,
+      explanation: `Valid in ${coveredStates.join(', ')}.`,
       weight: 20,
       score: 10,
     });
   }
 
   // 3. EMPLOYMENT / OCCUPATION FACTOR (Weight: 15)
-  const allowedOcc = scheme.eligibility.allowedOccupations || [];
-  const userOcc = profile.employmentType;
+  const allowedOcc = Array.isArray(eligibility.allowedOccupations) ? eligibility.allowedOccupations : [];
+  const userOcc = profile?.employmentType;
 
-  if (allowedOcc.length === 0) {
+  if (allowedOcc.length === 0 || allowedOcc.includes('All' as any)) {
     totalScore += 15;
     matchedReasons.push('Open to all employment and occupation backgrounds');
     factors.push({
@@ -139,9 +141,9 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
   }
 
   // 4. INCOME FACTOR (Weight: 20)
-  const userIncome = profile.incomeRange;
-  const maxIncome = scheme.eligibility.maxAnnualIncome ?? 0;
-  const allowedRanges = scheme.eligibility.incomeRangesAllowed || [];
+  const userIncome = profile?.incomeRange;
+  const maxIncome = eligibility.maxAnnualIncome ?? 0;
+  const allowedRanges = Array.isArray(eligibility.incomeRangesAllowed) ? eligibility.incomeRangesAllowed : [];
 
   if (maxIncome === 0 && allowedRanges.length === 0) {
     totalScore += 20;
@@ -199,10 +201,10 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
   }
 
   // 5. GENDER FACTOR (Weight: 10)
-  const allowedGenders = scheme.eligibility.allowedGenders || ['all'];
-  const userGender = profile.gender;
+  const allowedGenders = Array.isArray(eligibility.allowedGenders) ? eligibility.allowedGenders : ['all'];
+  const userGender = profile?.gender;
 
-  if (allowedGenders.includes('all') || allowedGenders.length === 0) {
+  if (allowedGenders.includes('all' as any) || allowedGenders.length === 0) {
     totalScore += 10;
     factors.push({
       criterion: 'Gender Eligibility',
@@ -243,12 +245,12 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
 
   // 6. CATEGORY & SPECIAL PROFILE SIGNALS (Weight: 15)
   let categoryScore = 0;
-  const allowedCategories = scheme.eligibility.allowedCategories || ['All'];
-  const userCat = profile.category;
+  const allowedCategories = Array.isArray(eligibility.allowedCategories) ? eligibility.allowedCategories : ['All'];
+  const userCat = profile?.category;
 
-  if (allowedCategories.includes('All') || allowedCategories.length === 0) {
+  if (allowedCategories.includes('All' as any) || allowedCategories.length === 0) {
     categoryScore += 8;
-  } else if (userCat && (allowedCategories.includes(userCat as any) || (userCat === 'Minority' && scheme.eligibility.requiresMinority))) {
+  } else if (userCat && (allowedCategories.includes(userCat as any) || (userCat === 'Minority' && eligibility.requiresMinority))) {
     categoryScore += 8;
     matchedReasons.push(`Social category requirement met (${userCat})`);
   } else if (userCat) {
@@ -258,16 +260,16 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
 
   // Check special conditions: Disability, BPL, Minority
   let specialMatched = true;
-  if (scheme.eligibility.requiresDisability) {
-    if (profile.isDisability) {
+  if (eligibility.requiresDisability) {
+    if (profile?.isDisability) {
       categoryScore += 7;
       matchedReasons.push('Benchmark disability criteria satisfied');
     } else {
       specialMatched = false;
       unmatchedWarnings.push('Requires certificate of benchmark disability (40%+).');
     }
-  } else if (scheme.eligibility.requiresBPL) {
-    if (profile.hasBPLCard || profile.incomeRange === 'Below ₹1 lakh') {
+  } else if (eligibility.requiresBPL) {
+    if (profile?.hasBPLCard || profile?.incomeRange === 'Below ₹1 lakh') {
       categoryScore += 7;
       matchedReasons.push('BPL / low economic bracket matched');
     } else {
@@ -310,7 +312,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
 
 export function rankSchemesForProfile(
   profile: UserProfile,
-  schemes: Scheme[] = ALL_SCHEMES
+  schemes: Scheme[] = []
 ): SchemeMatchResult[] {
   const results = schemes.map((scheme) => calculateSchemeMatch(scheme, profile));
 
@@ -322,3 +324,4 @@ export function rankSchemesForProfile(
     return b.scheme.popularScore - a.scheme.popularScore;
   });
 }
+

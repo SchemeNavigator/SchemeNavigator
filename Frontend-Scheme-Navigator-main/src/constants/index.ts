@@ -65,17 +65,32 @@ export const SCHEME_CATEGORIES: SchemeCategory[] = [
 ];
 
 export const CATEGORIES_WITH_META: { id: SchemeCategory; icon: string; count: number; desc: string }[] = [
-  { id: 'Education', icon: 'GraduationCap', count: 42, desc: 'Scholarships, fee waivers, educational loans & research grants' },
-  { id: 'Agriculture', icon: 'Sprout', count: 38, desc: 'Income support, crop insurance, solar pumps & farm subsidies' },
-  { id: 'Business', icon: 'Briefcase', count: 31, desc: 'Collateral-free loans, MSME subsidies & startup capital' },
-  { id: 'Women & Child', icon: 'HeartHandshake', count: 29, desc: 'Maternity assistance, girl child savings & self-help support' },
-  { id: 'Employment', icon: 'UserCheck', count: 26, desc: 'Apprenticeships, placement linked programs & livelihood missions' },
-  { id: 'Housing', icon: 'Home', count: 18, desc: 'Pucca house subsidies, interest subvention & urban housing' },
-  { id: 'Healthcare', icon: 'ShieldPlus', count: 24, desc: 'Cashless treatment cover, health insurance & wellness centers' },
-  { id: 'Social Security', icon: 'Users', count: 35, desc: 'Old-age pensions, widow pensions & disability stipends' },
-  { id: 'Skill Development', icon: 'Lightbulb', count: 20, desc: 'Free vocational certifications, industry skilling & toolkits' },
-  { id: 'Financial Assistance', icon: 'Coins', count: 27, desc: 'Direct benefit transfers, interest relief & disaster support' },
+  { id: 'Social Security', icon: 'Users', count: 1249, desc: 'Old-age pensions, widow pensions, disability stipends & social welfare' },
+  { id: 'Education', icon: 'GraduationCap', count: 816, desc: 'Scholarships, fee waivers, educational loans & research grants' },
+  { id: 'Agriculture', icon: 'Sprout', count: 614, desc: 'Income support, crop insurance, solar pumps & farm subsidies' },
+  { id: 'Business', icon: 'Briefcase', count: 500, desc: 'Collateral-free loans, MSME subsidies & startup capital' },
+  { id: 'Healthcare', icon: 'ShieldPlus', count: 156, desc: 'Cashless treatment cover, health insurance & wellness centers' },
+  { id: 'Financial Assistance', icon: 'Coins', count: 100, desc: 'Direct benefit transfers, interest relief & economic aid' },
+  { id: 'Skill Development', icon: 'Lightbulb', count: 100, desc: 'Free vocational certifications, industry skilling & toolkits' },
+  { id: 'Employment', icon: 'UserCheck', count: 96, desc: 'Apprenticeships, placement linked programs & livelihood missions' },
+  { id: 'Women & Child', icon: 'HeartHandshake', count: 73, desc: 'Maternity assistance, girl child savings & self-help support' },
+  { id: 'Housing', icon: 'Home', count: 64, desc: 'Pucca house subsidies, interest subvention & urban housing' },
 ];
+
+export const DEFAULT_CATEGORY_COUNTS: Record<string, number> = {
+  'Social Security': 1249,
+  'Education': 816,
+  'Agriculture': 614,
+  'Business': 500,
+  'Healthcare': 156,
+  'Financial Assistance': 100,
+  'Skill Development': 100,
+  'Employment': 96,
+  'Women & Child': 73,
+  'Housing': 64,
+  'Sports & Culture': 52,
+  'Travel & Tourism': 19,
+};
 
 export const EMPLOYMENT_TYPES: EmploymentType[] = [
   'Student',

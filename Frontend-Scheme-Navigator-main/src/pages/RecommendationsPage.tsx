@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getSavedProfile } from '../services/storageService';
-import { rankSchemesForProfile } from '../services/matchingEngine';
-import { ALL_SCHEMES } from '../data/allSchemes';
 import { SchemeCard } from '../components/schemes/SchemeCard';
 import { SchemeFilterBar } from '../components/schemes/SchemeFilterBar';
 import { api } from '../services/api';
 import { Link } from 'react-router-dom';
 import { SchemeCategory, SchemeMatchResult } from '../types';
+import { useTranslation } from '../hooks/useTranslation';
 
 import {
   Edit3,
@@ -23,6 +22,7 @@ import {
   Wrench,
   Users,
   ChevronDown,
+  ArrowRight,
 } from 'lucide-react';
 
 // ─── Occupation → Primary + secondary category priority map ──────────────────
@@ -100,6 +100,7 @@ interface CategoryGroup {
 function groupSchemesByOccupation(
   results: SchemeMatchResult[],
   employmentType: string | undefined,
+  tp: (phrase: string) => string,
 ): CategoryGroup[] {
   const occ = (employmentType || 'Other') as keyof typeof OCCUPATION_CATEGORY_MAP;
   const mapping = OCCUPATION_CATEGORY_MAP[occ] || OCCUPATION_CATEGORY_MAP['Other'];
@@ -116,8 +117,9 @@ function groupSchemesByOccupation(
   const groups: CategoryGroup[] = [];
 
   if (primaryResults.length > 0) {
+    const rawLabel = OCCUPATION_SECTION_LABELS[occ] || 'Most Relevant Schemes';
     groups.push({
-      label: OCCUPATION_SECTION_LABELS[occ] || 'Most Relevant Schemes',
+      label: tp(rawLabel),
       isPrimary: true,
       results: primaryResults,
     });
@@ -125,7 +127,7 @@ function groupSchemesByOccupation(
 
   if (secondaryResults.length > 0) {
     groups.push({
-      label: 'Other Potentially Relevant Schemes',
+      label: tp('Other Potentially Relevant Schemes'),
       isPrimary: false,
       results: secondaryResults,
     });
@@ -133,7 +135,7 @@ function groupSchemesByOccupation(
 
   if (otherResults.length > 0) {
     groups.push({
-      label: 'Additional Schemes',
+      label: tp('Additional Schemes'),
       isPrimary: false,
       results: otherResults,
     });
@@ -147,6 +149,7 @@ const CollapsibleGroup: React.FC<{ group: CategoryGroup; onSaveChange: () => voi
   group,
   onSaveChange,
 }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const preview = group.results.slice(0, 3);
   const rest = group.results.slice(3);
@@ -158,7 +161,7 @@ const CollapsibleGroup: React.FC<{ group: CategoryGroup; onSaveChange: () => voi
         <div className="flex items-center gap-2">
           <h2 className="text-base font-bold text-slate-700">{group.label}</h2>
           <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
-            {group.results.length} {group.results.length === 1 ? 'scheme' : 'schemes'}
+            {group.results.length} {group.results.length === 1 ? t('common.scheme', undefined, 'scheme') : t('common.schemes', undefined, 'schemes')}
           </span>
         </div>
       </div>
@@ -181,7 +184,7 @@ const CollapsibleGroup: React.FC<{ group: CategoryGroup; onSaveChange: () => voi
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
           >
             <ChevronDown className="w-4 h-4 text-slate-500" />
-            <span>Show {rest.length} more {rest.length === 1 ? 'scheme' : 'schemes'} in this category</span>
+            <span>{t('recommendations.show_more_schemes', { count: rest.length }, `Show ${rest.length} more schemes in this category`)}</span>
           </button>
         </div>
       )}
@@ -191,14 +194,20 @@ const CollapsibleGroup: React.FC<{ group: CategoryGroup; onSaveChange: () => voi
 
 
 export const RecommendationsPage: React.FC = () => {
+  const { t, tp, tCategory, tState, tOccupation } = useTranslation();
   const [profile, setProfile] = useState(() => getSavedProfile() || {});
   const [apiResults, setApiResults] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState<number>(20);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedState, setSelectedState] = useState(profile.state || 'All India');
   const [sortBy, setSortBy] = useState('relevance');
   const [minMatchScore, setMinMatchScore] = useState(0);
   const [, setForceUpdate] = useState(0);
+
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [selectedCategory, selectedState, searchQuery, sortBy, minMatchScore]);
 
   useEffect(() => {
     const handleProfileUpdate = () => {
@@ -227,7 +236,7 @@ export const RecommendationsPage: React.FC = () => {
 
   // Compute filtered recommendations
   const matchResults = useMemo(() => {
-    const sourceList = apiResults.length > 0 ? apiResults : rankSchemesForProfile(profile, ALL_SCHEMES);
+    const sourceList = apiResults;
 
     return sourceList.filter((res) => {
       const s = res.scheme;
@@ -269,42 +278,40 @@ export const RecommendationsPage: React.FC = () => {
 
   const categoryGroups = useMemo(() => {
     if (!isGrouped) return null;
-    return groupSchemesByOccupation(sortedResults, effectiveOccupation as string);
-  }, [isGrouped, sortedResults, effectiveOccupation]);
-
-  const occupationLabel = OCCUPATION_SECTION_LABELS[effectiveOccupation as string] || 'Relevant Schemes';
+    return groupSchemesByOccupation(sortedResults, effectiveOccupation as string, tp);
+  }, [isGrouped, sortedResults, effectiveOccupation, tp]);
 
   return (
-    <div className="bg-slate-50/80 min-h-screen py-8 sm:py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <div className="bg-slate-50/80 dark:bg-slate-950 min-h-screen py-6 sm:py-8 transition-colors duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-800 text-xs font-bold border border-teal-200">
-              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-              <span>Personalized Recommendations</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 text-xs font-bold border border-teal-200 dark:border-teal-800">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span>{t('recommendations.badge', undefined, 'Personalized Recommendations')}</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Schemes You May Be Eligible For
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              {t('recommendations.title', undefined, 'Schemes You May Be Eligible For')}
             </h1>
 
             {/* Profile Signals Pill */}
             <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-bold text-slate-500">Active Profile:</span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200">
-                {profile.name || 'User'}
+              <span className="font-bold text-slate-500 dark:text-slate-400">{t('recommendations.active_profile', undefined, 'Active Profile:')}</span>
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold border border-slate-200 dark:border-slate-700">
+                {profile.name || t('common.user', undefined, 'User')}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200">
-                {profile.age || 20} Yrs
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold border border-slate-200 dark:border-slate-700">
+                {profile.age || 20} {t('common.yrs', undefined, 'Yrs')}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200">
-                {profile.state || 'Haryana'} ({profile.areaType || 'Urban'})
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold border border-slate-200 dark:border-slate-700">
+                {profile.state ? tState(profile.state) : tState('Haryana')} ({tp(profile.areaType || 'Urban')})
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200">
-                {profile.employmentType || 'Student'}
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold border border-slate-200 dark:border-slate-700">
+                {tOccupation(profile.employmentType || 'Student')}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200">
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold border border-slate-200 dark:border-slate-700">
                 {profile.incomeRange || '₹1–2.5 lakh'}
               </span>
             </div>
@@ -312,18 +319,18 @@ export const RecommendationsPage: React.FC = () => {
 
           <Link
             to="/survey"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200 hover:border-teal-300 text-xs font-bold transition-all shrink-0 self-start md:self-center cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-teal-900 dark:hover:text-teal-300 border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 text-xs font-bold transition-all shrink-0 self-start md:self-center cursor-pointer"
           >
-            <Edit3 className="w-4 h-4 text-teal-700" />
-            <span>Edit Profile</span>
+            <Edit3 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+            <span>{t('recommendations.edit_profile_btn', undefined, 'Edit Profile')}</span>
           </Link>
         </div>
 
         {/* Informational Match Disclaimer */}
-        <div className="p-4 rounded-2xl bg-teal-50/80 border border-teal-200 text-xs text-slate-700 flex items-start gap-3">
-          <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl bg-teal-50/80 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-3">
+          <Info className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong>About Match Scores:</strong> The match percentage indicates structural alignment between your profile and publicly listed eligibility criteria. It is an informational navigation guide and does not constitute a government approval.
+            <strong>{t('recommendations.disclaimer_title', undefined, 'About Match Scores:')}</strong> {t('recommendations.disclaimer_text', undefined, 'The match percentage indicates structural alignment between your profile and publicly listed eligibility criteria. It is an informational navigation guide and does not constitute a government approval.')}
           </p>
         </div>
 
@@ -343,93 +350,82 @@ export const RecommendationsPage: React.FC = () => {
         />
 
         {/* Match Count Header */}
-        <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
-          <span>
-            Showing <strong className="text-slate-900">{sortedResults.length}</strong> matching potential{' '}
-            {sortedResults.length === 1 ? 'scheme' : 'schemes'}
-            {isGrouped && (
-              <span className="text-slate-400 font-normal ml-1">
-                — grouped by relevance to your occupation
-              </span>
-            )}
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold text-slate-600 dark:text-slate-400 px-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-100/80 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 font-extrabold text-sm border border-teal-200 dark:border-teal-800">
+              <Sparkles className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+              <span>{sortedResults.length} {sortedResults.length === 1 ? 'Scheme' : 'Schemes'} Found For You</span>
+            </span>
+            <span className="text-slate-500 dark:text-slate-400 font-medium hidden md:inline">
+              (Ranked by AI & eligibility fit)
+            </span>
+          </div>
+
           {selectedCategory !== 'All' && (
-            <span className="text-teal-800">
-              Filtered by Category: <strong>{selectedCategory}</strong>
+            <span className="text-teal-800 dark:text-teal-300">
+              {t('recommendations.filtered_by_cat', undefined, 'Filtered by Category:')} <strong>{tCategory(selectedCategory)}</strong>
             </span>
           )}
         </div>
 
         {/* Schemes Results */}
         {sortedResults.length > 0 ? (
-          isGrouped && categoryGroups && categoryGroups.length > 0 ? (
-            // ── Grouped view: occupation-aware sections ──────────────────────
-            <div className="space-y-12">
-              {categoryGroups.map((group, idx) => (
-                <div key={idx} className="space-y-5">
-                  {/* Section header */}
-                  <div className={`flex items-center gap-3 pb-3 border-b ${group.isPrimary ? 'border-teal-200' : 'border-slate-200'}`}>
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold ${
-                      group.isPrimary
-                        ? 'bg-teal-50 text-teal-800 border border-teal-200'
-                        : 'bg-slate-100 text-slate-700 border border-slate-200'
-                    }`}>
-                      {group.isPrimary
-                        ? (CATEGORY_ICONS[
-                            (OCCUPATION_CATEGORY_MAP[effectiveOccupation as string] || OCCUPATION_CATEGORY_MAP['Other'])
-                              .primary[0]
-                          ] || <Sparkles className="w-4 h-4 text-teal-600" />)
-                        : null}
-                      <span>{group.label}</span>
-                    </div>
-                  </div>
-
-                  {group.isPrimary ? (
-                    // Primary group – all cards visible
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {group.results.map((result) => (
-                        <SchemeCard
-                          key={result.scheme.id}
-                          matchResult={result}
-                          onSaveChange={() => setForceUpdate((p) => p + 1)}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    // Secondary / other groups – collapsible
-                    <CollapsibleGroup
-                      group={group}
-                      onSaveChange={() => setForceUpdate((p) => p + 1)}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            // ── Flat view: when filter/search applied ────────────────────────
+          <div className="space-y-8">
+            {/* Grid of Top Schemes (Showing first 20 by default) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedResults.map((result) => (
+              {sortedResults.slice(0, visibleCount).map((result) => (
                 <SchemeCard
-                  key={result.scheme.id}
+                  key={result.scheme.id || result.scheme.slug}
                   matchResult={result}
                   onSaveChange={() => setForceUpdate((p) => p + 1)}
                 />
               ))}
             </div>
-          )
+
+            {/* Next 20 Schemes Pagination Button */}
+            {visibleCount < sortedResults.length ? (
+              <div className="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + 20)}
+                  className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-gradient-to-r from-teal-700 via-teal-800 to-teal-950 hover:from-teal-800 hover:to-slate-900 text-white font-extrabold text-sm shadow-xl shadow-teal-950/20 hover:shadow-2xl transition-all cursor-pointer group active:scale-[0.98]"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-300 group-hover:rotate-12 transition-transform" />
+                  <span>Show Next {Math.min(20, sortedResults.length - visibleCount)} Eligible Schemes</span>
+                  <ArrowRight className="w-4 h-4 text-emerald-300 group-hover:translate-x-1 transition-transform" />
+                </button>
+                <span className="text-xs text-slate-500 font-medium">
+                  Showing {Math.min(visibleCount, sortedResults.length)} of {sortedResults.length} eligible schemes found for your profile
+                </span>
+              </div>
+            ) : (
+              <div className="text-center pt-6 pb-2 text-xs text-slate-400 font-medium">
+                ✓ Showing all {sortedResults.length} eligible schemes matching your criteria.
+              </div>
+            )}
+          </div>
         ) : (
-          /* Empty State */
-          <div className="bg-white rounded-3xl p-10 sm:p-16 border border-slate-200 text-center space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto">
+          /* Empty State - Clear "No Schemes For You" Message */
+          <div className="bg-white rounded-3xl p-10 sm:p-16 border border-slate-200 text-center space-y-5 shadow-sm max-w-2xl mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
               <AlertCircle className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900">
-              No matching schemes found for these filters
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-              We couldn't find a strong match based on your current filters. Try resetting the category/state filters or explore all schemes across India.
-            </p>
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <div className="space-y-1">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                No schemes found for you
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+                We could not find active government schemes matching your current profile parameters. You can recalibrate your details or browse the complete nationwide catalog.
+              </p>
+            </div>
+            <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                to="/survey"
+                className="px-6 py-3 bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Recalibrate Profile</span>
+              </Link>
               <button
                 onClick={() => {
                   setSelectedCategory('All');
@@ -437,15 +433,15 @@ export const RecommendationsPage: React.FC = () => {
                   setMinMatchScore(0);
                   setSearchQuery('');
                 }}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
-                Reset Filters
+                {t('explore.reset_filters', undefined, 'Reset Filters')}
               </button>
               <Link
                 to="/explore"
-                className="px-5 py-2.5 bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors"
               >
-                Explore All Schemes Directory
+                {t('recommendations.explore_all_btn', undefined, 'Explore All Schemes Directory')}
               </Link>
             </div>
           </div>

@@ -2,10 +2,11 @@
 Management command: import_schemes
 
 Usage:
-    python manage.py import_schemes --source csv --file path/to/schemes.csv
-    python manage.py import_schemes --source csv --file schemes.csv --dry-run
-    python manage.py import_schemes --source api --url https://...  # (stub, not yet implemented)
+    python manage.py import_schemes
+    python manage.py import_schemes --dry-run
 """
+from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 
 from schemes.datasources import get_datasource
@@ -13,27 +14,20 @@ from schemes.models import Scheme
 
 
 class Command(BaseCommand):
-    help = "Import or re-import schemes from a CSV file or external API."
+    help = "Import or sync schemes from live Government API (APIMitra / MyScheme)."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--source",
-            type=str,
-            default="csv",
-            choices=["csv", "api"],
-            help="Data source type (default: csv)",
-        )
-        parser.add_argument(
-            "--file",
-            type=str,
-            default="",
-            help="Path to CSV file (required when --source=csv)",
-        )
         parser.add_argument(
             "--url",
             type=str,
             default="",
-            help="API URL (required when --source=api)",
+            help="Government API URL (defaults to GOVT_SCHEME_API_URL from settings/.env)",
+        )
+        parser.add_argument(
+            "--api-key",
+            type=str,
+            default="",
+            help="Government API Key / Bearer token (defaults to GOVT_SCHEME_API_KEY from settings/.env)",
         )
         parser.add_argument(
             "--dry-run",
@@ -43,27 +37,21 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        source_type = options["source"]
         dry_run = options["dry_run"]
+        url = options["url"] or getattr(settings, "GOVT_SCHEME_API_URL", "")
+        api_key = options["api_key"] or getattr(settings, "GOVT_SCHEME_API_KEY", "")
+        if not url:
+            raise CommandError(
+                "Government API URL is required. Provide --url or set GOVT_SCHEME_API_URL in .env"
+            )
+        source_kwargs = {"url": url, "api_key": api_key}
 
-        # Build kwargs for the chosen source
-        if source_type == "csv":
-            file_path = options["file"]
-            if not file_path:
-                raise CommandError("--file is required when --source=csv")
-            source_kwargs = {"file_path": file_path}
-        else:
-            url = options["url"]
-            if not url:
-                raise CommandError("--url is required when --source=api")
-            source_kwargs = {"url": url}
-
-        self.stdout.write(f"Using source: {source_type}")
+        self.stdout.write("Using source: Government API (APIMitra / MyScheme)")
         if dry_run:
             self.stdout.write(self.style.WARNING("DRY RUN — no database writes."))
 
         try:
-            datasource = get_datasource(source_type, **source_kwargs)
+            datasource = get_datasource("api", **source_kwargs)
             raw_schemes = datasource.fetch_schemes()
         except (FileNotFoundError, NotImplementedError, ValueError) as exc:
             raise CommandError(str(exc)) from exc

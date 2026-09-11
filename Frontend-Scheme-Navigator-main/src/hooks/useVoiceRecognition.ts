@@ -22,21 +22,16 @@ export const useVoiceRecognition = (options: UseVoiceRecognitionOptions = {}) =>
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguageState] = useState(options.language || 'en-IN');
-  const [isSupported, setIsSupported] = useState(true);
+  const [isSupported, setIsSupported] = useState(() => typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
 
   const recognitionRef = useRef<any>(null);
   const onResultRef = useRef(options.onResult);
   const onErrorRef = useRef(options.onError);
 
-  onResultRef.current = options.onResult;
-  onErrorRef.current = options.onError;
-
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setIsSupported(false);
-    }
-  }, []);
+    onResultRef.current = options.onResult;
+    onErrorRef.current = options.onError;
+  });
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {

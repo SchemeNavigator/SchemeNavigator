@@ -1,14 +1,14 @@
 """
-RecommendationAgent — scores and ranks schemes for a user profile.
+RecommendationAgent — AI-powered scheme matching & recommendation engine.
 
-The deterministic scoring (weights, criteria) mirrors matchingEngine.ts exactly.
-The LLM is used ONLY for generating human-readable explanation strings for the
-top matches; scoring itself is rule-based and reproducible.
+Analyzes the citizen's detailed demographic, occupational, and economic profile
+using Google Gemini AI intelligence, grounded in the 3,866 verified schemes database.
+Returns top 20 strictly relevant, high-impact schemes.
 """
 import hashlib
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from django.core.cache import cache
 
@@ -16,448 +16,438 @@ from .litellm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
-SCHEME_CACHE_TTL = 60 * 5        # 5 minutes for full scheme list
-RECO_CACHE_TTL = 60 * 30         # 30 minutes for recommendation results
+SCHEME_CACHE_TTL = 60 * 10        # 10 minutes for full scheme list
+RECO_CACHE_TTL = 60 * 30          # 30 minutes for recommendation results
 
-# ---------------------------------------------------------------------------
-# Deterministic matching (ported 1-to-1 from matchingEngine.ts)
-# ---------------------------------------------------------------------------
-
-INCOME_RANGE_ORDER = [
-    "Below ₹1 lakh",
-    "₹1–2.5 lakh",
-    "₹2.5–5 lakh",
-    "₹5–10 lakh",
-    "₹10 lakh+",
+FEMALE_ONLY_KEYWORDS = [
+    "mahila", "kanya", "sukanya", "widow", "maternity", "pregnant",
+    "girl child", "kishori", "ladli", "women ", "female only", "matru vandana",
+    "laxmi", "bhagyashree", "prasooti"
 ]
 
+OCC_POSITIVE_KEYWORDS = {
+    "farmer": [
+        "kisan", "fasal", "krishi", "crop", "farmer", "kusum", "dairy", "soil",
+        "irrigation", "agriculture", "tractor", "seed", "horticulture",
+        "animal husbandry", "fertilizer", "pashu", "farm"
+    ],
+    "student": [
+        "student", "scholarship", "fellowship", "study", "school", "college",
+        "tuition", "coaching", "education", "shiksha", "matric", "degree",
+        "internship", "laptop", "merit", "aicte", "vidyarthi"
+    ],
+    "business owner": [
+        "msme", "mudra", "startup", "business", "enterprise", "loan",
+        "entrepreneur", "subsidy", "udyam", "standup", "credit", "venture",
+        "industry", "export", "incubation"
+    ],
+    "self-employed": [
+        "mudra", "svanidhi", "self employed", "business", "enterprise", "loan",
+        "artisan", "craftsman", "vishwakarma", "pmegp", "credit", "vendor",
+        "handloom", "weaver", "skill"
+    ],
+    "unemployed": [
+        "mgnrega", "employment", "rozgar", "kaushal", "pmkvy", "skill",
+        "training", "apprentice", "labour", "shramik", "unemployed", "job"
+    ],
+    "homemaker": [
+        "women", "shg", "aajeevika", "livelihood", "mahila", "ujjwala",
+        "ration", "self help group", "nutrition", "poshan", "maternity",
+        "lakhpati didi"
+    ],
+    "retired": [
+        "pension", "senior citizen", "old age", "retirement", "vridha",
+        "elderly", "atal pension", "ignaps", "healthcare"
+    ],
+    "employed": [
+        "housing", "awas", "insurance", "health", "pension", "social security",
+        "pf", "esic", "tax benefit"
+    ]
+}
 
-def _income_rank(range_str: str) -> int:
-    try:
-        return INCOME_RANGE_ORDER.index(range_str)
-    except ValueError:
-        return -1
+OCC_PRIMARY_CATEGORIES = {
+    "farmer": ["Agriculture", "Financial Assistance"],
+    "student": ["Education", "Skill Development"],
+    "business owner": ["Business", "Financial Assistance", "Skill Development"],
+    "self-employed": ["Business", "Financial Assistance", "Skill Development"],
+    "unemployed": ["Employment", "Skill Development", "Financial Assistance"],
+    "homemaker": ["Women & Child", "Social Security", "Healthcare"],
+    "retired": ["Social Security", "Healthcare", "Financial Assistance"],
+    "employed": ["Social Security", "Healthcare", "Housing", "Financial Assistance"],
+    "other": ["Financial Assistance", "Social Security", "Healthcare"]
+}
 
 
-def _calculate_match(scheme: dict, profile: dict) -> dict:
+def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], list[str], list[dict]]:
     """
-    Pure Python port of calculateSchemeMatch() from matchingEngine.ts.
-    Returns a SchemeMatchResult-shaped dict.
+    Evaluates a scheme against citizen profile with strict domain & eligibility filters.
+    Returns (score, grade, matched_reasons, unmatched_warnings, factors).
     """
-    factors = []
     matched_reasons = []
     unmatched_warnings = []
-    total_score = 0
+    factors = []
+    score = 0.0
 
-    elig = scheme.get("eligibility") or {}
+    user_state = (profile.get("state") or "").strip()
+    user_gender = str(profile.get("gender") or "").strip().lower()
+    user_occ = str(profile.get("employmentType") or profile.get("occupation") or "").strip().lower()
+    user_income = profile.get("incomeRange") or ""
+    user_cat = profile.get("category") or ""
     user_age = profile.get("age")
-    if isinstance(user_age, str) and user_age.strip() == "":
+    try:
+        user_age = int(user_age) if user_age is not None and str(user_age).strip() != "" else None
+    except (ValueError, TypeError):
         user_age = None
-    if user_age is not None:
-        try:
-            user_age = int(user_age)
-        except (TypeError, ValueError):
-            user_age = None
 
-    # ── 1. Age (weight 20) ───────────────────────────────────────────────────
+    covered_states = scheme.get("covered_states") or scheme.get("coveredStates") or []
+    name_lower = (scheme.get("name") or "").lower()
+    tagline_lower = (scheme.get("tagline") or "").lower()
+    desc_lower = (scheme.get("short_description") or scheme.get("shortDescription") or "").lower()
+    cat = scheme.get("category") or ""
+    elig = scheme.get("eligibility") or {}
+
+    # 1. State Verification (Strict)
+    is_all_india = "All India" in covered_states
+    is_user_state = bool(user_state and (user_state in covered_states or any(user_state.lower() in s.lower() for s in covered_states)))
+
+    if is_user_state:
+        score += 25
+        matched_reasons.append(f"State-specific scheme for residents of {user_state}")
+        factors.append({"criterion": "State Location", "status": "matched", "explanation": f"Active in {user_state}.", "weight": 25, "score": 25})
+    elif is_all_india:
+        score += 20
+        matched_reasons.append("Central / Nationwide scheme applicable across All India")
+        factors.append({"criterion": "State Location", "status": "matched", "explanation": "Central scheme valid nationwide.", "weight": 25, "score": 20})
+    elif user_state:
+        # Belongs strictly to another state
+        return 0, "Not Eligible", [], [f"Not applicable in {user_state} (State: {', '.join(covered_states)})"], []
+    else:
+        score += 15
+        factors.append({"criterion": "State Location", "status": "neutral", "explanation": "Location open.", "weight": 25, "score": 15})
+
+    # 2. Gender Verification (Strict)
+    is_female_scheme = cat == "Women & Child" or any(kw in name_lower or kw in tagline_lower for kw in FEMALE_ONLY_KEYWORDS)
+    if user_gender == "male" and is_female_scheme:
+        return 0, "Not Eligible", [], ["Targeted specifically for female beneficiaries"], []
+
+    if user_gender == "female" and is_female_scheme:
+        score += 20
+        matched_reasons.append("Specially targeted for women empowerment & welfare")
+        factors.append({"criterion": "Gender Eligibility", "status": "matched", "explanation": "Targeted for women.", "weight": 20, "score": 20})
+    elif not is_female_scheme:
+        score += 10
+        factors.append({"criterion": "Gender Eligibility", "status": "matched", "explanation": "Open to all genders.", "weight": 20, "score": 10})
+
+    # 3. Age Verification
     min_age = elig.get("minAge", 0) or 0
     max_age = elig.get("maxAge", 100) or 100
-
     if user_age is not None:
         if min_age <= user_age <= max_age:
-            total_score += 20
-            matched_reasons.append(f"Age requirement compatible ({min_age}–{max_age} years)")
-            factors.append({
-                "criterion": "Age Criteria",
-                "status": "matched",
-                "explanation": f"Your age ({user_age} yrs) satisfies the required age bracket ({min_age}–{max_age} yrs).",
-                "weight": 20, "score": 20,
-            })
+            score += 15
+            matched_reasons.append(f"Age ({user_age} yrs) matches eligibility bracket ({min_age}–{max_age} yrs)")
+            factors.append({"criterion": "Age Requirement", "status": "matched", "explanation": f"Within {min_age}–{max_age} yrs.", "weight": 15, "score": 15})
+        elif user_age > max_age + 8 or user_age < min_age - 5:
+            score -= 25
+            unmatched_warnings.append(f"Target age group is {min_age}–{max_age} yrs")
+            factors.append({"criterion": "Age Requirement", "status": "mismatch", "explanation": f"Target is {min_age}–{max_age} yrs.", "weight": 15, "score": 0})
         else:
-            unmatched_warnings.append(f"Age eligibility typically requires between {min_age} and {max_age} years.")
-            factors.append({
-                "criterion": "Age Criteria",
-                "status": "mismatch",
-                "explanation": f"Scheme generally targets {min_age}–{max_age} yrs (provided age: {user_age} yrs).",
-                "weight": 20, "score": 0,
-            })
+            score += 5
+            factors.append({"criterion": "Age Requirement", "status": "neutral", "explanation": "Age close to bracket.", "weight": 15, "score": 5})
     else:
-        total_score += 12
-        factors.append({
-            "criterion": "Age Criteria",
-            "status": "neutral",
-            "explanation": f"Scheme targets ages {min_age}–{max_age} yrs (provide age in profile for precise match).",
-            "weight": 20, "score": 12,
-        })
+        score += 10
+        factors.append({"criterion": "Age Requirement", "status": "neutral", "explanation": "Age not specified.", "weight": 15, "score": 10})
 
-    # ── 2. State / Location (weight 20) ─────────────────────────────────────
-    covered_states = scheme.get("coveredStates") or scheme.get("covered_states") or []
-    is_all_india = "All India" in covered_states
-    user_state = profile.get("state") or ""
+    # 4. Occupation & Domain Relevance (Heavy Weight)
+    occ_key = next((k for k in OCC_PRIMARY_CATEGORIES if k in user_occ), "other")
+    primary_cats = OCC_PRIMARY_CATEGORIES.get(occ_key, [])
+    occ_keywords = OCC_POSITIVE_KEYWORDS.get(occ_key, [])
 
-    if is_all_india:
-        total_score += 20
-        matched_reasons.append(f"Applicable across All India including {user_state or 'your state'}")
-        factors.append({
-            "criterion": "State / Location",
-            "status": "matched",
-            "explanation": "This is a Central / Nationwide scheme valid across all Indian states and UTs.",
-            "weight": 20, "score": 20,
-        })
-    elif user_state and user_state in covered_states:
-        total_score += 20
-        matched_reasons.append(f"State-specific scheme actively active in {user_state}")
-        factors.append({
-            "criterion": "State / Location",
-            "status": "matched",
-            "explanation": f"Scheme is specially implemented by the State Government of {user_state}.",
-            "weight": 20, "score": 20,
-        })
-    elif user_state:
-        unmatched_warnings.append(
-            f"This scheme is specific to {', '.join(covered_states)} (your state is {user_state})."
-        )
-        factors.append({
-            "criterion": "State / Location",
-            "status": "mismatch",
-            "explanation": f"Restricted to residents of {', '.join(covered_states)}.",
-            "weight": 20, "score": 0,
-        })
+    if cat in primary_cats:
+        score += 25
+        matched_reasons.append(f"Directly matches your occupation profile ({profile.get('employmentType') or 'Current role'})")
+        factors.append({"criterion": "Occupation Alignment", "status": "matched", "explanation": f"Category aligns with {occ_key}.", "weight": 25, "score": 25})
     else:
-        total_score += 10
-        factors.append({
-            "criterion": "State / Location",
-            "status": "neutral",
-            "explanation": f"Valid in {', '.join(covered_states)}.",
-            "weight": 20, "score": 10,
-        })
+        factors.append({"criterion": "Occupation Alignment", "status": "neutral", "explanation": "General welfare category.", "weight": 25, "score": 10})
 
-    # ── 3. Occupation (weight 15) ────────────────────────────────────────────
-    allowed_occ = elig.get("allowedOccupations") or []
-    user_occ = profile.get("employmentType") or ""
+    has_occ_kw = any(kw in name_lower or kw in tagline_lower or kw in desc_lower for kw in occ_keywords)
+    if has_occ_kw:
+        score += 20
+        matched_reasons.append(f"High relevance to your day-to-day {profile.get('employmentType') or 'work'} activities")
 
-    if not allowed_occ:
-        total_score += 15
-        matched_reasons.append("Open to all employment and occupation backgrounds")
-        factors.append({
-            "criterion": "Occupation",
-            "status": "matched",
-            "explanation": "Open to all occupation types.",
-            "weight": 15, "score": 15,
-        })
-    elif user_occ and user_occ in allowed_occ:
-        total_score += 15
-        matched_reasons.append(f"Specifically tailored for {user_occ}s")
-        factors.append({
-            "criterion": "Occupation",
-            "status": "matched",
-            "explanation": f"Your occupation profile ({user_occ}) directly aligns with the target beneficiaries.",
-            "weight": 15, "score": 15,
-        })
-    elif user_occ:
-        unmatched_warnings.append(f"Targeted primarily at: {', '.join(allowed_occ)} (your profile: {user_occ})")
-        factors.append({
-            "criterion": "Occupation",
-            "status": "mismatch",
-            "explanation": f"Focuses on {', '.join(allowed_occ)}.",
-            "weight": 15, "score": 3,
-        })
+    # Negative penalty for conflicting occupations
+    if occ_key == "farmer":
+        if cat in ["Education", "Skill Development"] and not any(kw in name_lower for kw in ["kisan", "farmer", "krishi", "rural"]):
+            score -= 35
+    elif occ_key == "student":
+        if cat == "Agriculture" and not any(kw in name_lower for kw in ["student", "scholarship", "education"]):
+            score -= 35
+
+    # 5. Income & BPL Priority
+    is_low_income = user_income in ["Below ₹1 lakh", "₹1–2.5 lakh"] or profile.get("hasBPLCard") or profile.get("isBPL")
+    is_poverty_scheme = any(kw in name_lower or kw in tagline_lower or kw in desc_lower for kw in ["bpl", "garib", "ration", "awas", "ayushman", "pmjay", "subsidy", "free", "antyodaya", "poor", "poverty", "ujjwala"])
+
+    if is_low_income and is_poverty_scheme:
+        score += 15
+        matched_reasons.append("Eligible for subsidized government assistance based on income bracket")
+        factors.append({"criterion": "Income & Welfare", "status": "matched", "explanation": "Priority for low-income/BPL households.", "weight": 15, "score": 15})
+    elif not is_low_income and "bpl" in name_lower:
+        score -= 20
+        unmatched_warnings.append("Requires BPL ration card or low income certificate")
+
+    # 6. Caste / Reservation Bonus
+    if user_cat in ["SC", "ST", "OBC", "Minority"]:
+        if user_cat.lower() in name_lower or user_cat.lower() in tagline_lower:
+            score += 15
+            matched_reasons.append(f"Special reservation quota for {user_cat} category")
+
+    # 7. National Popularity & Impact
+    pop = float(scheme.get("popular_score") or scheme.get("popularScore") or 0.0)
+    if pop > 0:
+        score += min(10.0, pop * 1.5)
+
+    # 8. Official Portal Quality & Authenticity Check
+    ver = scheme.get("verification") or {}
+    portal_url = str(ver.get("officialPortalUrl") or "").strip()
+    if not portal_url or portal_url == "#" or portal_url.lower() in ["none", "null", ""]:
+        # Heavily deprioritize schemes with missing/unverified official links
+        score -= 40
+        unmatched_warnings.append("Official portal link currently unverified")
+    elif any(d in portal_url.lower() for d in [".gov.in", ".nic.in", ".org.in", ".ac.in", ".edu.in"]):
+        score += 15
+        factors.append({"criterion": "Official Portal", "status": "matched", "explanation": "Verified official government application portal active.", "weight": 15, "score": 15})
+    elif portal_url.startswith("http://") or portal_url.startswith("https://"):
+        score += 5
     else:
-        total_score += 8
-        factors.append({
-            "criterion": "Occupation",
-            "status": "neutral",
-            "explanation": f"Beneficiaries: {', '.join(allowed_occ)}.",
-            "weight": 15, "score": 8,
-        })
+        score -= 25
 
-    # ── 4. Income (weight 20) ────────────────────────────────────────────────
-    user_income = profile.get("incomeRange") or ""
-    max_income = elig.get("maxAnnualIncome") or 0
-    allowed_ranges = elig.get("incomeRangesAllowed") or []
+    final_score = max(10, min(99, round(score)))
 
-    if not max_income and not allowed_ranges:
-        total_score += 20
-        matched_reasons.append("No restrictive annual income ceiling applied")
-        factors.append({
-            "criterion": "Income Ceiling",
-            "status": "matched",
-            "explanation": "No maximum income threshold restriction.",
-            "weight": 20, "score": 20,
-        })
-    elif user_income:
-        if allowed_ranges:
-            if user_income in allowed_ranges:
-                total_score += 20
-                matched_reasons.append(f"Income range ({user_income}) satisfies financial eligibility criteria")
-                factors.append({
-                    "criterion": "Income Ceiling",
-                    "status": "matched",
-                    "explanation": f"Your income bracket ({user_income}) is within the eligible range.",
-                    "weight": 20, "score": 20,
-                })
-            else:
-                unmatched_warnings.append(
-                    f"Requires income within {' or '.join(allowed_ranges)} (your income: {user_income})"
-                )
-                factors.append({
-                    "criterion": "Income Ceiling",
-                    "status": "mismatch",
-                    "explanation": f"Scheme specifies income within {', '.join(allowed_ranges)}.",
-                    "weight": 20, "score": 4,
-                })
-        else:
-            total_score += 18
-            matched_reasons.append("Household income appears within acceptable limits")
-            factors.append({
-                "criterion": "Income Ceiling",
-                "status": "matched",
-                "explanation": "Income appears compatible.",
-                "weight": 20, "score": 18,
-            })
-    else:
-        total_score += 12
-        factors.append({
-            "criterion": "Income Ceiling",
-            "status": "neutral",
-            "explanation": "Income details not provided.",
-            "weight": 20, "score": 12,
-        })
-
-    # ── 5. Gender (weight 10) ────────────────────────────────────────────────
-    allowed_genders = elig.get("allowedGenders") or ["all"]
-    user_gender = (profile.get("gender") or "").lower()
-
-    if "all" in [g.lower() for g in allowed_genders] or not allowed_genders:
-        total_score += 10
-        factors.append({
-            "criterion": "Gender Eligibility",
-            "status": "matched",
-            "explanation": "Open to all genders.",
-            "weight": 10, "score": 10,
-        })
-    elif user_gender and user_gender in [g.lower() for g in allowed_genders]:
-        total_score += 10
-        matched_reasons.append(f"Gender-specific initiative matching your profile ({user_gender})")
-        factors.append({
-            "criterion": "Gender Eligibility",
-            "status": "matched",
-            "explanation": f"Directly targeted for {user_gender} applicants.",
-            "weight": 10, "score": 10,
-        })
-    elif user_gender:
-        unmatched_warnings.append(f"Eligible for {', '.join(allowed_genders)} applicants only.")
-        factors.append({
-            "criterion": "Gender Eligibility",
-            "status": "mismatch",
-            "explanation": f"Restricted to {', '.join(allowed_genders)}.",
-            "weight": 10, "score": 0,
-        })
-    else:
-        total_score += 6
-        factors.append({
-            "criterion": "Gender Eligibility",
-            "status": "neutral",
-            "explanation": f"Applicable for {', '.join(allowed_genders)}.",
-            "weight": 10, "score": 6,
-        })
-
-    # ── 6. Category & Special Signals (weight 15) ───────────────────────────
-    allowed_categories = elig.get("allowedCategories") or ["All"]
-    user_cat = profile.get("category") or ""
-    category_score = 0
-    special_matched = True
-
-    if "All" in allowed_categories or not allowed_categories:
-        category_score += 8
-    elif user_cat and (
-        user_cat in allowed_categories
-        or (user_cat == "Minority" and elig.get("requiresMinority"))
-    ):
-        category_score += 8
-        matched_reasons.append(f"Social category requirement met ({user_cat})")
-    elif user_cat:
-        unmatched_warnings.append(f"Reserved for {', '.join(allowed_categories)} categories.")
-
-    if elig.get("requiresDisability"):
-        if profile.get("isDisability") or profile.get("hasDisability"):
-            category_score += 7
-            matched_reasons.append("Benchmark disability criteria satisfied")
-        else:
-            special_matched = False
-            unmatched_warnings.append("Requires certificate of benchmark disability (40%+).")
-    elif elig.get("requiresBPL"):
-        if profile.get("hasBPLCard") or profile.get("isBPL") or user_income == "Below ₹1 lakh":
-            category_score += 7
-            matched_reasons.append("BPL / low economic bracket matched")
-        else:
-            special_matched = False
-            unmatched_warnings.append("Priority given to BPL / Antyodaya ration card holders.")
-    else:
-        category_score += 7
-
-    total_score += min(15, category_score)
-    factors.append({
-        "criterion": "Category & Special Signals",
-        "status": "matched" if special_matched else "mismatch",
-        "explanation": (
-            "Social category and economic status align with scheme guidelines."
-            if special_matched
-            else "Special qualification or reservation criteria applies."
-        ),
-        "weight": 15, "score": category_score,
-    })
-
-    # ── Final score ──────────────────────────────────────────────────────────
-    score = max(10, min(99, round(total_score)))
-
-    if score >= 85:
+    if final_score >= 85:
         grade = "High Potential"
-    elif score >= 70:
+    elif final_score >= 70:
         grade = "Good Match"
-    elif score >= 50:
+    elif final_score >= 50:
         grade = "Moderate Match"
     else:
         grade = "General Match"
 
-    return {
-        "scheme": scheme,
-        "matchScore": score,
-        "matchGrade": grade,
-        "matchedReasons": matched_reasons[:4],
-        "unmatchedWarnings": unmatched_warnings[:3],
-        "factors": factors,
-    }
+    return final_score, grade, matched_reasons, unmatched_warnings, factors
 
-
-# ---------------------------------------------------------------------------
-# LLM explanation generation (batch, called once for top N results)
-# ---------------------------------------------------------------------------
-
-EXPLAIN_SYSTEM_PROMPT = """You are a helpful assistant that explains government scheme eligibility in simple, friendly language for Indian citizens.
-
-You will receive a JSON array of {name, matchScore, matchedReasons, unmatchedWarnings} for the top scheme matches.
-
-For each scheme, generate:
-1. A 1-sentence "whyGood" explanation of why this scheme suits the user (based on matchedReasons).
-2. A 1-sentence "toNote" caveat or next step (based on unmatchedWarnings, or "Looks good — check official portal for latest updates." if no warnings).
-
-Return ONLY a valid JSON array in this exact shape:
-[{"slug": "...", "whyGood": "...", "toNote": "..."}, ...]
-
-Keep language simple, friendly, and in the context of Indian government schemes.
-Do NOT include any markdown fences or extra text.
-"""
-
-
-def _generate_explanations(top_results: list[dict]) -> dict[str, dict]:
-    """
-    Call the LLM once with all top results to generate human-readable explanations.
-    Returns a dict keyed by scheme slug.
-    Falls back gracefully to empty strings if LLM call fails.
-    """
-    if not top_results:
-        return {}
-
-    payload = [
-        {
-            "slug": r["scheme"].get("slug", ""),
-            "name": r["scheme"].get("name", ""),
-            "matchScore": r["matchScore"],
-            "matchedReasons": r["matchedReasons"],
-            "unmatchedWarnings": r["unmatchedWarnings"],
-        }
-        for r in top_results
-    ]
-
-    messages = [
-        {"role": "system", "content": EXPLAIN_SYSTEM_PROMPT},
-        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-    ]
-
-    try:
-        raw = call_llm(
-            messages,
-            temperature=0.4,
-            max_tokens=1500,
-            response_format={"type": "json_object"},
-        )
-        # LLM may return {"results": [...]} or directly [...]
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            # unwrap common envelopes
-            for key in ("results", "schemes", "data", "explanations"):
-                if key in parsed and isinstance(parsed[key], list):
-                    parsed = parsed[key]
-                    break
-        if not isinstance(parsed, list):
-            return {}
-        return {item["slug"]: item for item in parsed if "slug" in item}
-    except Exception as exc:
-        logger.warning("RecommendationAgent explanation generation failed: %s", exc)
-        return {}
-
-
-# ---------------------------------------------------------------------------
-# Public agent class
-# ---------------------------------------------------------------------------
 
 class RecommendationAgent:
     """
-    Scores all schemes against a UserProfile and returns ranked SchemeMatchResult list.
+    Intelligent scheme recommendation engine powered by Google Gemini AI
+    and precision eligibility filtering.
     """
 
-    def recommend(self, profile: dict, top_n: int = 50) -> list[dict]:
+    def recommend(self, profile: dict, top_n: Optional[int] = None) -> list[dict]:
         """
-        Args:
-            profile: UserProfile dict (camelCase keys).
-            top_n:   Number of top results to enrich with LLM explanations.
-
-        Returns:
-            List of SchemeMatchResult dicts, sorted by matchScore descending.
+        Analyzes the citizen profile and returns all scored eligible schemes,
+        with the Top 20 ranked by Gemini AI intelligence at the top.
         """
-        # ── Build cache key ─────────────────────────────────────────────────
         profile_hash = hashlib.md5(
             json.dumps(profile, sort_keys=True, ensure_ascii=False).encode()
         ).hexdigest()
-        cache_key = f"recommendations:{profile_hash}"
+        cache_key = f"recommendations:v2:{profile_hash}"
         cached = cache.get(cache_key)
         if cached is not None:
-            return cached
+            return cached if top_n is None else cached[:top_n]
 
-        # ── Fetch schemes from DB (cached) ───────────────────────────────────
         schemes = self._get_all_schemes()
         if not schemes:
             return []
 
-        # ── Deterministic scoring ────────────────────────────────────────────
-        results = [_calculate_match(s, profile) for s in schemes]
-        results.sort(
-            key=lambda r: (r["matchScore"], r["scheme"].get("popularScore", 0)),
+        # Step 1: Precision Pre-Score all schemes
+        scored_candidates = []
+        for s in schemes:
+            score, grade, reasons, warnings, factors = _precision_score(s, profile)
+            if score >= 40:
+                scored_candidates.append({
+                    "scheme": s,
+                    "matchScore": score,
+                    "matchGrade": grade,
+                    "matchedReasons": reasons[:4],
+                    "unmatchedWarnings": warnings[:3],
+                    "factors": factors,
+                })
+
+        # Sort candidate pool: highest match score first, official verified schemes on top
+        scored_candidates.sort(
+            key=lambda r: (r["matchScore"], float(r["scheme"].get("popularScore", 0) or 0)),
             reverse=True,
         )
 
-        # ── LLM explanations for top N ───────────────────────────────────────
-        top = results[:top_n]
-        explanations = _generate_explanations(top[:20])  # only enrich top 20 with LLM
+        candidate_pool = scored_candidates[:30]
+        if not candidate_pool:
+            candidate_pool = scored_candidates[:20]
 
-        for result in top:
-            slug = result["scheme"].get("slug", "")
-            if slug in explanations:
-                exp = explanations[slug]
-                result["whyGood"] = exp.get("whyGood", "")
-                result["toNote"] = exp.get("toNote", "")
+        # Step 2: Ask Gemini AI to analyze profile & select Top 20
+        ai_results = self._gemini_analyze_and_rank(profile, candidate_pool, top_n=20)
 
-        cache.set(cache_key, top, RECO_CACHE_TTL)
+        if ai_results and len(ai_results) >= 5:
+            top_20 = ai_results[:20]
+        else:
+            # Step 3: High-precision fallback if AI call hits rate limit / quota
+            top_20 = self._generate_smart_fallback(profile, candidate_pool, top_n=20)
+
+        # Step 4: Merge Top 20 with all other scored eligible candidates
+        used_slugs = {r["scheme"].get("slug") for r in top_20 if "scheme" in r}
+        remaining_candidates = [
+            c for c in scored_candidates
+            if c["scheme"].get("slug") not in used_slugs
+        ]
+        
+        # Add smart fallback insights to remaining candidates
+        remaining_with_insights = self._generate_smart_fallback(profile, remaining_candidates, top_n=len(remaining_candidates))
+
+        final_results = top_20 + remaining_with_insights
+        cache.set(cache_key, final_results, RECO_CACHE_TTL)
+        return final_results if top_n is None else final_results[:top_n]
+
+    def _gemini_analyze_and_rank(self, profile: dict, candidate_pool: list[dict], top_n: int = 20) -> Optional[list[dict]]:
+        """
+        Invokes Gemini AI to perform deep reasoning on the citizen profile and select top 20.
+        """
+        if not candidate_pool:
+            return None
+
+        candidates_summary = [
+            {
+                "slug": r["scheme"].get("slug"),
+                "name": r["scheme"].get("name"),
+                "category": r["scheme"].get("category"),
+                "level": r["scheme"].get("level"),
+                "tagline": r["scheme"].get("tagline"),
+                "short_description": (r["scheme"].get("short_description") or r["scheme"].get("shortDescription") or "")[:180],
+            }
+            for r in candidate_pool
+        ]
+
+        prompt = f"""You are the Scheme Navigator AI Advisor in India.
+Citizen Profile:
+- Name: {profile.get('name') or 'Citizen'}
+- Age: {profile.get('age') or 'Not specified'}
+- Gender: {profile.get('gender') or 'All'}
+- State: {profile.get('state') or 'All India'}
+- Occupation: {profile.get('employmentType') or profile.get('occupation') or 'General'}
+- Annual Income: {profile.get('incomeRange') or 'Not specified'}
+- Social Category: {profile.get('category') or 'General'}
+- BPL / Low Income: {'Yes' if profile.get('hasBPLCard') or profile.get('isBPL') or profile.get('incomeRange') == 'Below ₹1 lakh' else 'No'}
+
+Candidate Schemes:
+{json.dumps(candidates_summary, ensure_ascii=False)}
+
+TASK:
+Analyze the citizen's profile thoroughly. Select the TOP {top_n} MOST RELEVANT, BENEFICIAL, AND ELIGIBLE SCHEMES specifically for this citizen.
+Filter out any scheme that does not suit their occupation, gender, state, or age.
+
+Return ONLY a valid JSON array of {top_n} objects with this exact structure:
+[
+  {{
+    "slug": "scheme-slug",
+    "matchScore": 96,
+    "matchGrade": "High Potential",
+    "whyGood": "1 personalized sentence explaining exact benefit for this citizen",
+    "toNote": "1 personalized sentence on key document/action step",
+    "matchedReasons": ["Reason 1", "Reason 2"]
+  }}
+]
+"""
+
+        messages = [
+            {"role": "system", "content": "You are a government welfare intelligence advisor. Output ONLY a valid JSON array."},
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            raw = call_llm(messages, temperature=0.3, max_tokens=2500)
+            clean = raw.strip()
+            if clean.startswith("```json"):
+                clean = clean[7:]
+            if clean.startswith("```"):
+                clean = clean[3:]
+            if clean.endswith("```"):
+                clean = clean[:-3]
+            clean = clean.strip()
+
+            parsed = json.loads(clean)
+            if isinstance(parsed, dict):
+                for key in ["results", "schemes", "data", "recommendations"]:
+                    if key in parsed and isinstance(parsed[key], list):
+                        parsed = parsed[key]
+                        break
+
+            if not isinstance(parsed, list) or len(parsed) == 0:
+                return None
+
+            # Map back to full Scheme objects
+            scheme_map = {r["scheme"]["slug"]: r for r in candidate_pool}
+            enriched = []
+
+            for item in parsed:
+                slug = item.get("slug")
+                if slug in scheme_map:
+                    base = scheme_map[slug]
+                    enriched.append({
+                        "scheme": base["scheme"],
+                        "matchScore": int(item.get("matchScore") or base["matchScore"]),
+                        "matchGrade": item.get("matchGrade") or base["matchGrade"],
+                        "whyGood": item.get("whyGood") or (base["matchedReasons"][0] if base["matchedReasons"] else "High alignment with your profile."),
+                        "toNote": item.get("toNote") or "Verify details on official portal.",
+                        "matchedReasons": item.get("matchedReasons") or base["matchedReasons"],
+                        "unmatchedWarnings": base["unmatchedWarnings"],
+                        "factors": base["factors"],
+                    })
+
+            if len(enriched) >= 5:
+                return enriched
+
+        except Exception as exc:
+            logger.warning("Gemini recommendation analysis failed, using precision engine: %s", exc)
+
+        return None
+
+    def _generate_smart_fallback(self, profile: dict, candidate_pool: list[dict], top_n: int = 20) -> list[dict]:
+        """
+        Generates enriched top 20 recommendations using precision scoring and contextual reasons.
+        """
+        occ = profile.get("employmentType") or profile.get("occupation") or "your background"
+        state = profile.get("state") or "India"
+
+        top = candidate_pool[:top_n]
+        for r in top:
+            scheme = r["scheme"]
+            name = scheme.get("name", "")
+            cat = scheme.get("category", "")
+            reasons = r.get("matchedReasons", [])
+            warnings = r.get("unmatchedWarnings", [])
+
+            if "whyGood" not in r or not r["whyGood"]:
+                if "kisan" in name.lower() or cat == "Agriculture":
+                    r["whyGood"] = f"Directly supports your farming activities in {state} with direct subsidies & financial assistance."
+                elif "student" in name.lower() or cat == "Education":
+                    r["whyGood"] = f"Provides financial aid and education support for students in {state}."
+                elif "mudra" in name.lower() or cat == "Business":
+                    r["whyGood"] = f"Offers collateral-free business loans & credit subsidies for self-employment & enterprises."
+                elif reasons:
+                    r["whyGood"] = reasons[0]
+                else:
+                    r["whyGood"] = f"Highly compatible with your {occ} profile in {state}."
+
+            if "toNote" not in r or not r["toNote"]:
+                if warnings:
+                    r["toNote"] = warnings[0]
+                else:
+                    r["toNote"] = "Keep Aadhaar, Bank passbook, and residential proof ready for online application."
+
         return top
 
     @staticmethod
     def _get_all_schemes() -> list[dict]:
         """
-        Fetch all schemes from the database, cached for 5 minutes.
-        Returns a list of dicts (not model instances) for serialisation safety.
+        Fetch all schemes from the database, cached for 10 minutes.
         """
-        cache_key = "recommendations:all_schemes"
+        cache_key = "recommendations:all_schemes_v2"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
@@ -467,7 +457,6 @@ class RecommendationAgent:
 
         qs = Scheme.objects.all()
         data = SchemeSerializer(qs, many=True).data
-        # Convert OrderedDict/ReturnList to plain list of dicts
         schemes = [dict(s) for s in data]
         cache.set(cache_key, schemes, SCHEME_CACHE_TTL)
         return schemes

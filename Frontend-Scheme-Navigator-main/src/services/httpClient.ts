@@ -27,6 +27,16 @@ class HttpApiClient {
   private async getToken(): Promise<string> {
     if (this._token) return this._token;
 
+    try {
+      const stored = sessionStorage.getItem('sn_session_token');
+      if (stored) {
+        this._token = stored;
+        return stored;
+      }
+    } catch {
+      // ignore
+    }
+
     // Only one creation request at a time (avoids double-create on concurrent startup calls)
     if (!this._tokenPromise) {
       this._tokenPromise = this._createSession().finally(() => {
@@ -42,6 +52,11 @@ class HttpApiClient {
     const data = await res.json();
     const token: string = data.token;
     this._token = token;
+    try {
+      sessionStorage.setItem('sn_session_token', token);
+    } catch {
+      // ignore
+    }
     return token;
   }
 
@@ -181,6 +196,7 @@ class HttpApiClient {
     const path = `/api/schemes/${qs.toString() ? '?' + qs.toString() : ''}`;
     return this.request<{
       schemes: Scheme[];
+      categoryCounts?: Record<string, number>;
       pagination: { page: number; limit: number; total: number; totalPages: number };
     }>(path);
   }
@@ -221,17 +237,34 @@ class HttpApiClient {
 
   // ── AI Assistant ──────────────────────────────────────────────────────────
 
-  async askAI(query: string): Promise<{ answer: string; referencedSchemes?: Scheme[] }> {
+  async askAI(
+    query: string,
+    history?: Array<{ role: string; content: string }>,
+    profile?: UserProfile | null
+  ): Promise<{
+    answer: string;
+    referencedSchemes?: Scheme[];
+    profileUpdated?: boolean;
+    updatedProfile?: Partial<UserProfile>;
+  }> {
     const data = await this.post<{
       answer: string;
       referencedSchemes: Scheme[];
       profileUpdated: boolean;
-    }>('/api/assistant/chat/', { message: query });
+      updatedProfile?: Partial<UserProfile>;
+    }>('/api/assistant/chat/', {
+      message: query,
+      history: history || [],
+      profile: profile || undefined,
+    });
     return {
       answer: data.answer,
       referencedSchemes: data.referencedSchemes,
+      profileUpdated: data.profileUpdated,
+      updatedProfile: data.updatedProfile,
     };
   }
 }
 
 export { HttpApiClient };
+

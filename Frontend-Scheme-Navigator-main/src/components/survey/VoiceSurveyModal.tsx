@@ -4,7 +4,7 @@ import { parseVoiceInput, ParsedEntity } from '../../utils/voiceParser';
 import { UserProfile } from '../../types';
 import { TOP_INDIAN_LANGUAGES, LanguageInfo } from '../../constants/languages';
 import { useAppStore } from '../../store/appStore';
-import { applySiteLanguage } from '../../utils/translator';
+import { useTranslation } from '../../hooks/useTranslation';
 import {
   Mic,
   MicOff,
@@ -33,6 +33,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
   currentStep = 1,
 }) => {
   const { selectedLanguage, setSelectedLanguage } = useAppStore();
+  const { t } = useTranslation();
   const [showLanguageGrid, setShowLanguageGrid] = useState(false);
   const [fullText, setFullText] = useState('');
   const [parsedData, setParsedData] = useState<ReturnType<typeof parseVoiceInput>>({
@@ -63,12 +64,12 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
   // When modal opens, start speech recognition
   useEffect(() => {
     if (isOpen) {
-      setFullText('');
-      setParsedData({ profile: {}, entities: [], rawText: '' });
-      resetTranscript();
       const timer = setTimeout(() => {
+        setFullText('');
+        setParsedData({ profile: {}, entities: [], rawText: '' });
+        resetTranscript();
         startListening();
-      }, 250);
+      }, 150);
       return () => clearTimeout(timer);
     } else {
       stopListening();
@@ -77,7 +78,6 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
 
   const handleLanguageChange = (lang: LanguageInfo) => {
     setSelectedLanguage(lang);
-    applySiteLanguage(lang.code);
     setLanguage(lang.speechCode);
     setShowLanguageGrid(false);
     resetTranscript();
@@ -128,7 +128,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold">Voice Survey Assistant</h3>
+                <h3 className="text-base sm:text-lg font-bold">{t('voice.title', undefined, 'Voice Survey Assistant')}</h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-extrabold uppercase">
                   12 Indian Languages
                 </span>
@@ -158,7 +158,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             <div className="flex items-center justify-between bg-slate-100 p-2 rounded-2xl">
               <div className="flex items-center gap-2 px-2 text-xs font-bold text-slate-700">
                 <Languages className="w-4 h-4 text-teal-700" />
-                <span>Selected Language:</span>
+                <span>{t('voice.selected_lang', undefined, 'Selected Language:')}</span>
                 <span className="px-2.5 py-1 rounded-xl bg-teal-800 text-white text-xs font-bold">
                   {selectedLanguage.nativeName} ({selectedLanguage.name})
                 </span>
@@ -168,7 +168,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
                 onClick={() => setShowLanguageGrid(!showLanguageGrid)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-teal-900 hover:bg-teal-50 border border-slate-200 text-xs font-bold transition-all shadow-2xs cursor-pointer"
               >
-                <span>Change Language</span>
+                <span>{t('voice.change_lang', undefined, 'Change Language')}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showLanguageGrid ? 'rotate-180' : ''}`} />
               </button>
             </div>
@@ -211,8 +211,8 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold block">Browser Unsupported:</span>
-                Your browser does not support the Web Speech API. Please use Google Chrome, Microsoft Edge, or Safari for voice input.
+                <span className="font-bold block">{t('voice.unsupported_title', undefined, 'Browser Unsupported:')}</span>
+                {t('voice.unsupported_desc', undefined, 'Your browser does not support the Web Speech API. Please use Google Chrome, Microsoft Edge, or Safari for voice input.')}
               </div>
             </div>
           )}
@@ -255,10 +255,10 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
 
             <div className="text-center">
               <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 block">
-                {isListening ? `Listening in ${selectedLanguage.nativeName}...` : 'Microphone Paused'}
+                {isListening ? `${t('voice.listening_in', undefined, 'Listening in')} ${selectedLanguage.nativeName}...` : t('voice.paused', undefined, 'Microphone Paused')}
               </span>
               <span className="text-[11px] text-slate-500">
-                {isListening ? 'Speak naturally in your native language' : 'Tap the microphone to resume speaking'}
+                {isListening ? t('voice.speak_hint', undefined, 'Speak naturally in your native language') : t('voice.resume_hint', undefined, 'Tap the microphone to resume speaking')}
               </span>
             </div>
           </div>
@@ -268,7 +268,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <div className="flex items-center gap-1">
                 <Volume2 className="w-3.5 h-3.5 text-teal-600" />
-                <span>Live Speech Transcript:</span>
+                <span>{t('voice.transcript_title', undefined, 'Live Speech Transcript:')}</span>
               </div>
               {displayedSpeech && (
                 <button
@@ -277,14 +277,14 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
                   className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-teal-800 font-semibold cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>Clear</span>
+                  <span>{t('voice.clear_btn', undefined, 'Clear')}</span>
                 </button>
               )}
             </div>
             <p className="text-sm font-medium text-slate-900 italic leading-relaxed">
               {displayedSpeech ? `“${displayedSpeech}”` : (
                 <span className="text-slate-400 not-italic font-normal">
-                  Speak in {selectedLanguage.nativeName} (e.g. "{currentPrompt.examples[0]}")
+                  {t('voice.speak_example_prefix', undefined, 'Speak in')} {selectedLanguage.nativeName} (e.g. "{currentPrompt.examples[0]}")
                 </span>
               )}
             </p>
@@ -295,7 +295,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-2.5 animate-in fade-in">
               <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Recognized Form Fields ({parsedData.entities.length})</span>
+                <span>{t('voice.recognized_fields', { count: parsedData.entities.length }, `Recognized Form Fields (${parsedData.entities.length})`)}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {parsedData.entities.map((item, idx) => (
@@ -314,7 +314,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
           {/* Example Suggestions tailored in the Active Regional Language */}
           <div className="space-y-1.5">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-              Try saying in {selectedLanguage.nativeName} ({currentPrompt.title}):
+              {t('voice.try_saying', undefined, 'Try saying in')} {selectedLanguage.nativeName} ({currentPrompt.title}):
             </span>
             <div className="grid grid-cols-1 gap-1.5">
               {currentPrompt.examples.map((ex, i) => (
@@ -329,7 +329,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
                   className="text-left text-xs text-slate-700 hover:text-teal-950 hover:bg-slate-100 px-3 py-2 rounded-xl transition-colors border border-dashed border-slate-200 cursor-pointer flex items-center justify-between"
                 >
                   <span className="font-medium">"{ex}"</span>
-                  <span className="text-[10px] text-teal-700 font-bold ml-2 shrink-0">Click to test</span>
+                  <span className="text-[10px] text-teal-700 font-bold ml-2 shrink-0">{t('voice.click_to_test', undefined, 'Click to test')}</span>
                 </button>
               ))}
             </div>
@@ -346,7 +346,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             }}
             className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-200/70 text-slate-700 text-xs font-bold transition-all cursor-pointer"
           >
-            Cancel
+            {t('common.cancel', undefined, 'Cancel')}
           </button>
 
           <button
@@ -360,7 +360,7 @@ export const VoiceSurveyModal: React.FC<VoiceSurveyModalProps> = ({
             }`}
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>Fill Form Fields</span>
+            <span>{t('voice.fill_form_fields', undefined, 'Fill Form Fields')}</span>
           </button>
         </div>
       </div>

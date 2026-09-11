@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, Category } from '../../types';
+import { useTranslation } from '../../hooks/useTranslation';
 import { HelpCircle, Info, ShieldCheck, HeartPulse, Users } from 'lucide-react';
 import { VoiceMicButton } from './VoiceMicButton';
 
@@ -11,14 +12,15 @@ interface StepBackgroundProps {
 
 export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChange, onOpenVoice }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const { t, tp } = useTranslation();
 
   const categories: { id: Category | string; label: string; desc: string }[] = [
-    { id: 'General', label: 'General / Open', desc: 'No category reservation quota' },
-    { id: 'SC', label: 'Scheduled Caste (SC)', desc: 'Applicable central / state welfare schemes' },
-    { id: 'ST', label: 'Scheduled Tribe (ST)', desc: 'Tribal welfare & special scholarship grants' },
-    { id: 'OBC', label: 'OBC (Other Backward Classes)', desc: 'Non-creamy / central or state list' },
-    { id: 'EWS', label: 'EWS (Economically Weaker)', desc: 'Income & asset verified certificate' },
-    { id: 'Other', label: 'Other / Prefer not to say', desc: 'General statutory guidelines apply' },
+    { id: 'General', label: t('survey.general'), desc: 'No category reservation quota' },
+    { id: 'SC', label: t('survey.sc'), desc: 'Applicable central / state welfare schemes' },
+    { id: 'ST', label: t('survey.st'), desc: 'Tribal welfare & special scholarship grants' },
+    { id: 'OBC', label: t('survey.obc'), desc: 'Non-creamy / central or state list' },
+    { id: 'EWS', label: t('survey.ews'), desc: 'Income & asset verified certificate' },
+    { id: 'Other', label: tp('Other'), desc: 'General statutory guidelines apply' },
   ];
 
   const hasDisability = Boolean(profile.hasDisability ?? profile.isDisability);
@@ -28,14 +30,14 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
       <div>
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
-            Step 3 of 6 • Social Background
+            {t('survey.stepOf', { step: 3, total: 6 })} {t('survey.stepBackground')}
           </span>
           <div className="flex items-center gap-3">
             {onOpenVoice && (
               <VoiceMicButton
                 onClick={onOpenVoice}
                 variant="pill"
-                label="Speak"
+                label={t('survey.speak')}
                 sublabel="बोलें"
               />
             )}
@@ -65,21 +67,21 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
         </div>
 
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
-          Social Category & Special Signals
+          {t('survey.stepBackground')}
         </h2>
         <p className="text-sm text-slate-600 mt-1">
-          Select your background to unlock category-specific scholarships and welfare incentives.
+          {t('howItWorks.subtitle')}
         </p>
       </div>
 
       {/* Category Grid */}
       <div className="space-y-3">
         <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          Category <span className="text-rose-500">*</span>
+          {t('survey.categoryLabel')} <span className="text-rose-500">*</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {categories.map((cat) => {
-            const isSelected = profile.category === cat.id || (!profile.category && cat.id === 'General');
+            const isSelected = profile.category === cat.id;
             return (
               <button
                 key={cat.id}
@@ -118,7 +120,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
               <HeartPulse className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
                 <span className="text-sm font-bold text-slate-900 block">
-                  Do you have a disability?
+                  {t('survey.disabilityLabel')}
                 </span>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Enables assistive device subsidies (ADIP), UDID card benefits, and reservation allowances.
@@ -142,7 +144,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                 }`}
               >
-                No
+                {t('survey.no')}
               </button>
               <button
                 type="button"
@@ -159,7 +161,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                 }`}
               >
-                Yes
+                {t('survey.yes')}
               </button>
             </div>
           </div>
@@ -168,7 +170,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
           {hasDisability && (
             <div className="pt-3 border-t border-slate-200 flex items-center gap-3 animate-in fade-in">
               <label className="text-xs font-bold text-slate-700 shrink-0">
-                Differently Abled Percentage (0–100%):
+                {t('survey.disabilityPercent')}:
               </label>
               <input
                 type="number"
@@ -211,7 +213,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                 }`}
               >
-                No
+                {t('survey.no')}
               </button>
               <button
                 type="button"
@@ -222,7 +224,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                 }`}
               >
-                Yes
+                {t('survey.yes')}
               </button>
             </div>
           </div>
@@ -234,7 +236,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
               <span className="text-sm font-bold text-slate-900 block">
-                Below Poverty Line (BPL)
+                {t('survey.bplLabel')}
               </span>
               <p className="text-xs text-slate-500 mt-0.5">
                 Priority for Ayushman Bharat cashless hospital care, housing subsidies, and subsidized rations.
@@ -252,7 +254,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
             >
-              No
+              {t('survey.no')}
             </button>
             <button
               type="button"
@@ -263,7 +265,7 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
               }`}
             >
-              Yes
+              {t('survey.yes')}
             </button>
           </div>
         </div>

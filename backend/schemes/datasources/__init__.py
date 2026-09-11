@@ -1,26 +1,20 @@
 """
 DataSource factory — returns the right DataSource instance based on source type.
-
-To register a new source:
-  1. Create a new class in its own file (e.g. api_source_v2.py)
-  2. Add an entry to the _REGISTRY dict below
 """
 from .base import DataSource
-from .csv_source import CSVDataSource
 from .api_source import ExternalAPIDataSource
 
 _REGISTRY: dict[str, type[DataSource]] = {
-    "csv": CSVDataSource,
     "api": ExternalAPIDataSource,
 }
 
 
-def get_datasource(source_type: str, **kwargs) -> DataSource:
+def get_datasource(source_type: str = "api", **kwargs) -> DataSource:
     """
     Factory function.
 
     Args:
-        source_type: One of the registered source type strings (e.g. "csv", "api").
+        source_type: Registered source type string ("api").
         **kwargs: Constructor arguments forwarded to the chosen DataSource class.
 
     Returns:
@@ -38,4 +32,5 @@ def get_datasource(source_type: str, **kwargs) -> DataSource:
     return cls(**kwargs)
 
 
-__all__ = ["DataSource", "CSVDataSource", "ExternalAPIDataSource", "get_datasource"]
+__all__ = ["DataSource", "ExternalAPIDataSource", "get_datasource"]
+

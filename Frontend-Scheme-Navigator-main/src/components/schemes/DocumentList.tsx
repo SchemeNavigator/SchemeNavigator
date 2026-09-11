@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
 import { DocumentRequirement } from '../../types';
-import { FileText, CheckCircle2, AlertCircle, Info, Download } from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { useTranslation } from '../../hooks/useTranslation';
+import { translateDocumentName } from '../../utils/schemeTranslator';
 
 interface DocumentListProps {
-  documents: DocumentRequirement[];
+  documents?: DocumentRequirement[];
 }
 
-export const DocumentList: React.FC<DocumentListProps> = ({ documents }) => {
+export const DocumentList: React.FC<DocumentListProps> = ({ documents = [] }) => {
+  const { t, langCode } = useTranslation();
   const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({});
+
+  const safeDocs = Array.isArray(documents) ? documents : [];
 
   const toggleDoc = (id: string) => {
     setCheckedDocs((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const getDocTypeBadge = (type: string) => {
-    switch (type) {
+  const getDocTypeBadge = (type?: string) => {
+    const safeType = (type || 'other').toLowerCase();
+    switch (safeType) {
       case 'identity':
         return 'bg-blue-50 text-blue-800 border-blue-200';
       case 'income':
@@ -30,31 +36,48 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents }) => {
     }
   };
 
+  if (safeDocs.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+        <h3 className="text-xl font-bold text-slate-900">
+          {t('scheme_detail.documents_title', undefined, 'Documents You May Need')}
+        </h3>
+        <p className="text-xs text-slate-500">
+          {t('scheme_detail.no_documents_specified', undefined, 'Standard identity and residence proofs (such as Aadhaar Card) are generally sufficient for this scheme.')}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-xl font-bold text-slate-900">
-            Documents You May Need
+            {t('scheme_detail.documents_title', undefined, 'Documents You May Need')}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Keep clear digital scans (PDF/JPG under 200KB) ready before starting the online application.
+            {t('scheme_detail.documents_subtitle', undefined, 'Keep clear digital scans (PDF/JPG under 200KB) ready before starting the online application.')}
           </p>
         </div>
 
         <span className="text-xs font-semibold text-slate-500">
-          {Object.values(checkedDocs).filter(Boolean).length} of {documents.length} prepared
+          {Object.values(checkedDocs).filter(Boolean).length} {t('scheme_detail.of', undefined, 'of')} {safeDocs.length} {t('scheme_detail.prepared', undefined, 'prepared')}
         </span>
       </div>
 
       {/* Document Items */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {documents.map((doc) => {
-          const isReady = !!checkedDocs[doc.id];
+        {safeDocs.map((doc, idx) => {
+          const docId = doc.id || (doc as any)._id || `doc-${idx}`;
+          const isReady = !!checkedDocs[docId];
+          const isMandatory = Boolean(doc.isMandatory ?? (doc as any).mandatory);
+          const docType = doc.documentType || 'other';
+
           return (
             <div
-              key={doc.id}
-              onClick={() => toggleDoc(doc.id)}
+              key={docId}
+              onClick={() => toggleDoc(docId)}
               className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 select-none ${
                 isReady
                   ? 'bg-emerald-50/60 border-emerald-400 shadow-2xs'
@@ -72,22 +95,24 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents }) => {
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-slate-900 truncate">
-                    {doc.name}
+                    {translateDocumentName(doc.name, langCode) || 'Identity / Supporting Document'}
                   </span>
-                  {doc.isMandatory && (
+                  {isMandatory && (
                     <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
-                      Mandatory
+                      {t('scheme_detail.doc_mandatory', undefined, 'Mandatory')}
                     </span>
                   )}
                 </div>
 
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  {doc.description}
-                </p>
+                {doc.description && (
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {doc.description}
+                  </p>
+                )}
 
                 <div className="pt-1">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${getDocTypeBadge(doc.documentType)}`}>
-                    {doc.documentType.toUpperCase()}
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${getDocTypeBadge(docType)}`}>
+                    {String(docType).toUpperCase()}
                   </span>
                 </div>
               </div>
@@ -100,7 +125,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents }) => {
       <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5">
         <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <span>
-          <strong>Document Reminder:</strong> Required documents may vary by state implementation. Please cross-verify the latest circular on the official portal before final submission.
+          <strong>{t('scheme_detail.doc_reminder_title', undefined, 'Document Reminder:')}</strong> {t('scheme_detail.doc_reminder_desc', undefined, 'Required documents may vary by state implementation. Please cross-verify the latest circular on the official portal before final submission.')}
         </span>
       </div>
     </div>

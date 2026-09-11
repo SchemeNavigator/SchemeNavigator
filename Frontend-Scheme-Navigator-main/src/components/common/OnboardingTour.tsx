@@ -15,22 +15,22 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
+import { useTranslation } from '../../hooks/useTranslation';
 
 const TOUR_STORAGE_KEY = 'scheme_navigator_onboarding_completed_v1';
-const WELCOME_STORAGE_KEY = 'scheme_navigator_welcome_dismissed_v1';
+const WELCOME_SESSION_KEY = 'scheme_navigator_welcome_session_seen';
 
 export const OnboardingTour: React.FC = () => {
+  const { t } = useTranslation();
   const { isTourActive, startTour, stopTour, handleCheckEligibility } = useAppStore();
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(false);
-  const [dontShowAgain, setDontShowAgain] = useState<boolean>(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is first-time visitor
-    const hasSeenWelcome = localStorage.getItem(WELCOME_STORAGE_KEY);
-    const hasCompletedTour = localStorage.getItem(TOUR_STORAGE_KEY);
+    // Show welcome window on every fresh visit / browser opening
+    const hasSeenInSession = sessionStorage.getItem(WELCOME_SESSION_KEY);
 
-    if (!hasSeenWelcome && !hasCompletedTour) {
+    if (!hasSeenInSession) {
       // Show small welcome modal after a slight delay for smooth page load
       const timer = setTimeout(() => {
         setShowWelcomeModal(true);
@@ -42,41 +42,29 @@ export const OnboardingTour: React.FC = () => {
   const tourSteps: Step[] = [
     {
       target: '#nav-check-eligibility',
-      title: '1. Smart Eligibility Survey 📋',
-      content:
-        'Start your journey here! Take a quick 2-minute survey without needing Aadhaar or sensitive documents to discover personalized schemes.',
+      title: t('tour.step1_title', undefined, '1. Smart Eligibility Survey 📋'),
+      content: t('tour.step1_desc', undefined, 'Start your journey here! Take a quick 2-minute survey without needing Aadhaar or sensitive documents to discover personalized schemes.'),
       placement: 'bottom',
       buttons: ['primary', 'skip'],
     },
     {
       target: '#nav-explore',
-      title: '2. Explore & Recommendations 🎯',
-      content:
-        'Browse 100+ verified Central & State government schemes with live eligibility criteria, instant match scores, and category filters.',
+      title: t('tour.step2_title', undefined, '2. Explore & Recommendations 🎯'),
+      content: t('tour.step2_desc', undefined, 'Browse verified Central & State government schemes with live eligibility criteria, instant match scores, and category filters.'),
       placement: 'bottom',
       buttons: ['back', 'primary', 'skip'],
     },
     {
       target: '#nav-saved-schemes',
-      title: '3. Save & Bookmark Schemes 📌',
-      content:
-        'Bookmark schemes you qualify for with a single tap to store them in your personal dashboard for easy comparison.',
-      placement: 'bottom',
-      buttons: ['back', 'primary', 'skip'],
-    },
-    {
-      target: '#nav-track-schemes',
-      title: '4. Track Application Milestones 🚀',
-      content:
-        'Keep track of document checklists, official portal links, and status deadlines directly in your citizen tracker.',
+      title: t('tour.step3_title', undefined, '3. Saved Schemes & Tracker 📌'),
+      content: t('tour.step3_desc', undefined, 'Bookmark schemes you qualify for with a single tap to store and track application milestones in your citizen dashboard.'),
       placement: 'bottom',
       buttons: ['back', 'primary', 'skip'],
     },
     {
       target: '#nav-ai-advisor',
-      title: '5. Multilingual AI Advisor 🤖',
-      content:
-        'Have queries about eligibility or guidelines? Ask our AI Scheme Advisor 24/7 in English, Hindi, and regional languages.',
+      title: t('tour.step5_title', undefined, '4. Mitra AI Scheme Advisor 🤖'),
+      content: t('tour.step5_desc', undefined, 'Have queries about eligibility or guidelines? Ask Mitra, our AI Scheme Advisor 24/7 in English, Hindi, and regional languages.'),
       placement: 'bottom',
       buttons: ['back', 'primary'],
     },
@@ -86,26 +74,24 @@ export const OnboardingTour: React.FC = () => {
     const { status } = data;
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       stopTour();
-      localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+      sessionStorage.setItem(WELCOME_SESSION_KEY, 'true');
     }
   };
 
   const handleDismissWelcome = () => {
     setShowWelcomeModal(false);
-    if (dontShowAgain) {
-      localStorage.setItem(WELCOME_STORAGE_KEY, 'true');
-    }
+    sessionStorage.setItem(WELCOME_SESSION_KEY, 'true');
   };
 
   const handleStartTourFromModal = () => {
     setShowWelcomeModal(false);
-    localStorage.setItem(WELCOME_STORAGE_KEY, 'true');
+    sessionStorage.setItem(WELCOME_SESSION_KEY, 'true');
     startTour();
   };
 
   const handleStartSurveyFromModal = () => {
     setShowWelcomeModal(false);
-    localStorage.setItem(WELCOME_STORAGE_KEY, 'true');
+    sessionStorage.setItem(WELCOME_SESSION_KEY, 'true');
     handleCheckEligibility(navigate);
   };
 
@@ -164,11 +150,11 @@ export const OnboardingTour: React.FC = () => {
           },
         }}
         locale={{
-          back: 'Back',
-          close: 'Close',
-          last: 'Get Started 🎉',
-          next: 'Next →',
-          skip: 'Skip Tour',
+          back: t('common.back', undefined, 'Back'),
+          close: t('common.close', undefined, 'Close'),
+          last: t('tour.get_started', undefined, 'Get Started 🎉'),
+          next: t('tour.next', undefined, 'Next →'),
+          skip: t('tour.skip', undefined, 'Skip Tour'),
         }}
       />
 
@@ -201,7 +187,7 @@ export const OnboardingTour: React.FC = () => {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-700/70 border border-teal-500/40 text-[11px] font-bold text-emerald-300">
                     <Sparkles className="w-3 h-3 text-emerald-300" />
-                    First-Time Welcome
+                    {t('tour.welcomeBadge', undefined, 'First-Time Welcome')}
                   </span>
                 </div>
 
@@ -211,10 +197,10 @@ export const OnboardingTour: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-xl font-extrabold tracking-tight text-white">
-                      Welcome to SchemeNavigator! 🇮🇳
+                      {t('tour.welcomeTitle', undefined, 'Welcome to SchemeNavigator! 🇮🇳')}
                     </h3>
                     <p className="text-xs text-teal-200 mt-0.5">
-                      Your guide to 100+ government welfare schemes, made simple.
+                      {t('tour.welcomeSubtitle', undefined, 'Your guide to 100+ government welfare schemes, made simple.')}
                     </p>
                   </div>
                 </div>
@@ -223,7 +209,7 @@ export const OnboardingTour: React.FC = () => {
               {/* Body: 4 Key Pillars */}
               <div className="p-6 space-y-5">
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-                  Discover financial support, grants, and subsidies tailored to your profile in 4 easy steps:
+                  {t('tour.welcomePillarsDesc', undefined, 'Discover financial support, grants, and subsidies tailored to your profile in 4 easy steps:')}
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -232,8 +218,8 @@ export const OnboardingTour: React.FC = () => {
                       <ClipboardCheck className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">1. Quick Survey</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">2 min eligibility check</p>
+                      <h4 className="text-xs font-bold text-slate-900">{t('tour.pillar1Title', undefined, '1. Quick Survey')}</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{t('tour.pillar1Desc', undefined, '2 min eligibility check')}</p>
                     </div>
                   </div>
 
@@ -242,8 +228,8 @@ export const OnboardingTour: React.FC = () => {
                       <Award className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">2. Match Scores</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Transparent fit metrics</p>
+                      <h4 className="text-xs font-bold text-slate-900">{t('tour.pillar2Title', undefined, '2. Match Scores')}</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{t('tour.pillar2Desc', undefined, 'Transparent fit metrics')}</p>
                     </div>
                   </div>
 
@@ -252,8 +238,8 @@ export const OnboardingTour: React.FC = () => {
                       <Bookmark className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">3. Save Schemes</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">1-click citizen locker</p>
+                      <h4 className="text-xs font-bold text-slate-900">{t('tour.pillar3Title', undefined, '3. Save Schemes')}</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{t('tour.pillar3Desc', undefined, '1-click citizen locker')}</p>
                     </div>
                   </div>
 
@@ -262,8 +248,8 @@ export const OnboardingTour: React.FC = () => {
                       <TrendingUp className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">4. Track Status</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Checklist & deadlines</p>
+                      <h4 className="text-xs font-bold text-slate-900">{t('tour.pillar4Title', undefined, '4. Track Status')}</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{t('tour.pillar4Desc', undefined, 'Checklist & deadlines')}</p>
                     </div>
                   </div>
                 </div>
@@ -271,7 +257,7 @@ export const OnboardingTour: React.FC = () => {
                 {/* Trust assurance */}
                 <div className="flex items-center gap-2 p-2.5 rounded-xl bg-teal-50/70 border border-teal-100 text-teal-900 text-xs font-medium">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>100% Free & Secure. No Aadhaar number or login required.</span>
+                  <span>{t('tour.trustBadge', undefined, '100% Free & Secure. No Aadhaar number or login required.')}</span>
                 </div>
 
                 {/* Action CTA Buttons */}
@@ -282,7 +268,7 @@ export const OnboardingTour: React.FC = () => {
                     className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-teal-700 via-teal-800 to-teal-950 hover:from-teal-800 hover:to-slate-900 text-white text-sm font-bold rounded-2xl shadow-md shadow-teal-900/20 hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
-                    <span>Take a 30s Interactive Tour ✨</span>
+                    <span>{t('tour.startTourBtn', undefined, 'Take a 30s Interactive Tour ✨')}</span>
                     <ArrowRight className="w-4 h-4 text-teal-200" />
                   </button>
 
@@ -292,39 +278,33 @@ export const OnboardingTour: React.FC = () => {
                       onClick={handleStartSurveyFromModal}
                       className="flex-1 py-2.5 px-3 bg-white hover:bg-slate-50 text-teal-900 text-xs font-bold rounded-xl border border-teal-200 hover:border-teal-300 transition-all cursor-pointer"
                     >
-                      🚀 Start Survey Directly
+                      {t('tour.startSurveyBtn', undefined, '🚀 Start Survey Directly')}
                     </button>
                     <button
                       type="button"
                       onClick={handleDismissWelcome}
                       className="flex-1 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
                     >
-                      Explore on my own
+                      {t('tour.exploreOwnBtn', undefined, 'Explore on my own')}
                     </button>
                   </div>
                 </div>
 
-                {/* Don't show again toggle */}
+                {/* Quick Hint / Help */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={dontShowAgain}
-                      onChange={(e) => setDontShowAgain(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded text-teal-700 focus:ring-teal-500 cursor-pointer"
-                    />
-                    <span>Don't show this welcome window again</span>
-                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    💡 You can revisit the tour anytime from the <strong className="text-teal-800">Tour</strong> button in the header.
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
                       setShowWelcomeModal(false);
                       startTour();
                     }}
-                    className="text-teal-700 hover:text-teal-900 font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    className="text-teal-700 hover:text-teal-900 font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0 ml-2"
                   >
                     <HelpCircle className="w-3 h-3" />
-                    Tour Help
+                    {t('tour.tourHelp', undefined, 'Tour Help')}
                   </button>
                 </div>
               </div>

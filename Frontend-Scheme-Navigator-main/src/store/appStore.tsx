@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, SchemeMatchResult, Scheme, TrackerItem } from '../types';
 import { api } from '../services/api';
-import { getSavedProfile, getSavedSchemeIds, getTrackerItems } from '../services/storageService';
-import { ALL_SCHEMES } from '../data/allSchemes';
+import { getSavedProfile, saveUserProfile, getSavedSchemeIds, getSavedSchemes, toggleSaveScheme, getTrackerItems } from '../services/storageService';
 import { TOP_INDIAN_LANGUAGES, LanguageInfo, getLanguageByCode } from '../constants/languages';
 
 export interface ProfileStatus {
@@ -24,6 +24,7 @@ export interface AppState {
   applications: TrackerItem[];
   selectedLanguage: LanguageInfo;
   isTourActive: boolean;
+  theme: 'light' | 'dark';
   loading: boolean;
   error: string | null;
 
@@ -36,6 +37,8 @@ export interface AppState {
   updateApplicationStatus: (item: TrackerItem) => Promise<void>;
   setSelectedScheme: (scheme: Scheme | null) => void;
   setSelectedLanguage: (lang: LanguageInfo | string) => void;
+  toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark') => void;
   handleCheckEligibility: (navigate: (path: string) => void) => void;
   startTour: () => void;
   stopTour: () => void;
@@ -58,10 +61,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recommendations, setRecommendations] = useState<SchemeMatchResult[]>([]);
   const [selectedScheme, setSelectedScheme] = useState<Scheme | null>(null);
   const [savedSchemeIds, setSavedSchemeIds] = useState<string[]>(() => getSavedSchemeIds());
-  const [savedSchemes, setSavedSchemes] = useState<Scheme[]>(() =>
-    ALL_SCHEMES.filter((s) => getSavedSchemeIds().includes(s.id))
-  );
+  const [savedSchemes, setSavedSchemes] = useState<Scheme[]>(() => getSavedSchemes());
   const [applications, setApplications] = useState<TrackerItem[]>(() => getTrackerItems());
+
+  useEffect(() => {
+    const syncSaved = () => {
+      setSavedSchemeIds(getSavedSchemeIds());
+      setSavedSchemes(getSavedSchemes());
+    };
+    window.addEventListener('sn_saved_updated', syncSaved);
+    return () => window.removeEventListener('sn_saved_updated', syncSaved);
+  }, []);
   const [selectedLanguage, setSelectedLanguageState] = useState<LanguageInfo>(() => {
     try {
       const savedCode = localStorage.getItem('scheme_navigator_language');
@@ -76,6 +86,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isTourActive, setIsTourActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Theme state: default to 'dark' as requested by user, or stored preference
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('scheme_navigator_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {
+      // ignore
+    }
+    return 'dark';
+  });
+
+  // Apply dark class to <html> element whenever theme changes
+  useEffect(() => {
+    try {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      localStorage.setItem('scheme_navigator_theme', theme);
+    } catch (e) {
+      console.warn('Theme toggle error:', e);
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  const setTheme = useCallback((newTheme: 'light' | 'dark') => {
+    setThemeState(newTheme);
+  }, []);
 
   const startTour = useCallback(() => {
     setIsTourActive(true);
@@ -98,6 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setProfile = (fields: Partial<UserProfile>) => {
     setProfileState((prev) => {
       const updated = { ...(prev || {}), ...fields } as UserProfile;
+      saveUserProfile(updated);
       api.updateProfile(updated);
       setProfileStatus({
         exists: true,
@@ -118,37 +162,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
     try {
       const result = await api.submitSurvey(surveyProfile);
-      setProfileState(result.profile);
+      const finalProfile = (result && result.profile) ? result.profile : surveyProfile;
+      setProfileState(finalProfile);
+      saveUserProfile(finalProfile);
       setProfileStatus({
         exists: true,
         isComplete: true,
         completionPercentage: 100,
       });
       setSurveyDraft(null);
-      setRecommendations(result.recommendations);
-      return result.recommendations;
+      setRecommendations(result.recommendations || []);
+      return result.recommendations || [];
     } catch (err: any) {
       setError(err?.message || "We couldn't process your profile right now. Please try again.");
+      // Even if offline/network error, persist the filled profile locally!
+      setProfileState(surveyProfile);
+      saveUserProfile(surveyProfile);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleBookmark = async (schemeId: string) => {
-    const isSaved = savedSchemeIds.includes(schemeId);
-    if (isSaved) {
-      setSavedSchemeIds((prev) => prev.filter((id) => id !== schemeId));
-      setSavedSchemes((prev) => prev.filter((s) => s.id !== schemeId));
-      await api.removeSavedScheme(schemeId);
-    } else {
-      setSavedSchemeIds((prev) => [...prev, schemeId]);
-      const found = ALL_SCHEMES.find((s) => s.id === schemeId);
-      if (found) {
-        setSavedSchemes((prev) => [found, ...prev]);
+  const toggleBookmark = async (schemeId: string, schemeObj?: Scheme) => {
+    let target = schemeObj;
+    if (!target) {
+      try {
+        target = await api.getScheme(schemeId);
+      } catch {
+        // ignore
       }
-      await api.saveScheme(schemeId);
     }
+    toggleSaveScheme(schemeId, target);
   };
 
   const updateApplicationStatus = async (item: TrackerItem) => {
@@ -193,6 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         applications,
         selectedLanguage,
         isTourActive,
+        theme,
         loading,
         error,
         setProfile,
@@ -203,6 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateApplicationStatus,
         setSelectedScheme,
         setSelectedLanguage,
+        toggleTheme,
+        setTheme,
         handleCheckEligibility,
         startTour,
         stopTour,

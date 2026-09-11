@@ -15,6 +15,7 @@ import {
   User,
 } from 'lucide-react';
 import { VoiceMicButton } from './VoiceMicButton';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface StepEmploymentProps {
   profile: UserProfile;
@@ -43,6 +44,8 @@ const OCCUPATION_OPTIONS = [
 ];
 
 export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChange, onOpenVoice }) => {
+  const { t, tp, tOccupation } = useTranslation();
+
   const getEmploymentIcon = (type: EmploymentType) => {
     switch (type) {
       case 'Student':
@@ -66,40 +69,40 @@ export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChang
     }
   };
 
-  const currentEmpStatus = (profile.employmentStatus || profile.employmentType || 'Student') as EmploymentType;
+  const currentEmpStatus = profile.employmentStatus || profile.employmentType || '';
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       <div>
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
-            Step 4 of 6 • Occupation & Livelihood
+            {t('survey.step4_badge', undefined, 'Step 4 of 6 • Occupation & Livelihood')}
           </span>
           {onOpenVoice && (
             <VoiceMicButton
               onClick={onOpenVoice}
               variant="pill"
-              label="Speak"
+              label={t('voice.speak_btn', undefined, 'Speak')}
               sublabel="बोलें"
             />
           )}
         </div>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
-          Employment Status & Occupation
+          {t('survey.step4_title', undefined, 'Employment Status & Occupation')}
         </h2>
         <p className="text-sm text-slate-600 mt-1">
-          Government departments create specialized schemes tailored to specific professional and livelihood groups.
+          {t('survey.step4_desc', undefined, 'Government departments create specialized schemes tailored to specific professional and livelihood groups.')}
         </p>
       </div>
 
       {/* Main Employment Status Grid */}
       <div className="space-y-3">
         <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          Employment Status <span className="text-rose-500">*</span>
+          {t('survey.emp_status_label', undefined, 'Employment Status')} <span className="text-rose-500">*</span>
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {EMPLOYMENT_TYPES.map((type) => {
-            const isSelected = currentEmpStatus === type;
+            const isSelected = Boolean(currentEmpStatus && currentEmpStatus === type);
             return (
               <button
                 key={type}
@@ -128,7 +131,7 @@ export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChang
                   </div>
                 </div>
                 <span className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-teal-950' : 'text-slate-800'}`}>
-                  {type}
+                  {tp(type)}
                 </span>
               </button>
             );
@@ -141,12 +144,12 @@ export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChang
         <div className="p-5 rounded-2xl bg-teal-50/70 border border-teal-200/80 space-y-3 animate-in fade-in duration-150">
           <div className="flex items-center gap-2 text-xs font-bold text-teal-900 uppercase tracking-wider">
             <Building className="w-4 h-4 text-teal-700" />
-            <span>Employment Sector</span>
+            <span>{t('survey.emp_sector_label', undefined, 'Employment Sector')}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { id: 'GOVERNMENT', label: 'Government / Public Sector', desc: 'Central / State Govt / PSU' },
-              { id: 'PRIVATE', label: 'Private Sector', desc: 'Corporate / Pvt Ltd / MSME employee' },
+              { id: 'GOVERNMENT', labelKey: 'survey.sector_govt', label: 'Government / Public Sector', desc: 'Central / State Govt / PSU' },
+              { id: 'PRIVATE', labelKey: 'survey.sector_pvt', label: 'Private Sector', desc: 'Corporate / Pvt Ltd / MSME employee' },
             ].map((sector) => {
               const isSelected = profile.employmentType === sector.id || profile.employmentType === sector.id.toLowerCase();
               return (
@@ -160,7 +163,7 @@ export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChang
                       : 'bg-white text-slate-700 border-teal-200 hover:bg-teal-100/50'
                   }`}
                 >
-                  <div className="text-xs font-bold">{sector.label}</div>
+                  <div className="text-xs font-bold">{t(sector.labelKey, undefined, sector.label)}</div>
                   <p className={`text-[11px] mt-0.5 ${isSelected ? 'text-teal-200' : 'text-slate-500'}`}>
                     {sector.desc}
                   </p>
@@ -174,18 +177,19 @@ export const StepEmployment: React.FC<StepEmploymentProps> = ({ profile, onChang
       {/* Specific Occupation Dropdown (Single Select) */}
       <div className="space-y-2">
         <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          Specific Occupation <span className="text-rose-500">*</span>
+          {t('survey.specific_occupation', undefined, 'Specific Occupation')} <span className="text-rose-500">*</span>
         </label>
         <div className="relative">
           <User className="absolute left-4 top-3.5 w-5 h-5 text-teal-700" />
           <select
-            value={profile.occupation || currentEmpStatus || 'Student'}
+            value={profile.occupation || ''}
             onChange={(e) => onChange({ occupation: e.target.value })}
             className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border border-slate-300 focus:border-teal-600 focus:bg-white rounded-2xl text-slate-900 text-sm font-semibold outline-hidden transition-all appearance-none cursor-pointer"
           >
+            <option value="">-- {t('survey.select_occupation', undefined, 'Select Occupation')} --</option>
             {OCCUPATION_OPTIONS.map((occ) => (
               <option key={occ} value={occ}>
-                {occ}
+                {tOccupation(occ)}
               </option>
             ))}
           </select>

@@ -1,7 +1,7 @@
 /**
- * Universal Website Translator Helper
- * Integrates with Google Translate engine and cookie state to translate
- * the entire website DOM in real time across all 12 Indian Languages.
+ * Native Language Helper
+ * Manages document language attributes, direction, and storage synchronization cleanly.
+ * Fully independent of external translation services.
  */
 
 export const getShortLangCode = (bcp47Code: string): string => {
@@ -9,80 +9,36 @@ export const getShortLangCode = (bcp47Code: string): string => {
   return bcp47Code.split('-')[0].toLowerCase();
 };
 
-export const setGoogleTranslateCookie = (langCode: string) => {
-  const shortCode = getShortLangCode(langCode);
-  const cookieValue = shortCode === 'en' ? '/en/en' : `/en/${shortCode}`;
-
-  // Clear older versions
-  const domains = [
-    window.location.hostname,
-    `.${window.location.hostname}`,
-    '',
-  ];
-
-  domains.forEach((d) => {
-    const domainStr = d ? `; domain=${d}` : '';
-    document.cookie = `googtrans=${cookieValue}; path=/${domainStr}`;
-    document.cookie = `googtrans=${cookieValue}; path=/${domainStr}; max-age=31536000`;
-  });
-};
-
 export const applySiteLanguage = (bcp47Code: string) => {
+  if (typeof document === 'undefined') return;
   const shortCode = getShortLangCode(bcp47Code);
+  document.documentElement.lang = shortCode;
 
-  // 1. Set Google Translate cookies
-  setGoogleTranslateCookie(bcp47Code);
-
-  // 2. Try to find the Google Translate combo select element
-  const selectElem = document.querySelector('.goog-te-combo') as HTMLSelectElement | null;
-  if (selectElem) {
-    if (selectElem.value !== shortCode) {
-      selectElem.value = shortCode;
-      selectElem.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+  // Urdu is RTL, other Indian languages are LTR
+  if (shortCode === 'ur') {
+    document.documentElement.dir = 'rtl';
   } else {
-    // If not rendered yet, trigger iframe or reload if cookie is fresh
-    const gTranslateFrame = document.querySelector('iframe.goog-te-banner-frame') as HTMLIFrameElement | null;
-    if (gTranslateFrame) {
-      try {
-        const frameDoc = gTranslateFrame.contentDocument || gTranslateFrame.contentWindow?.document;
-        const selectInside = frameDoc?.querySelector('select') as HTMLSelectElement | null;
-        if (selectInside) {
-          selectInside.value = shortCode;
-          selectInside.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      } catch {
-        // cross-origin frame fallback
-      }
-    }
+    document.documentElement.dir = 'ltr';
+  }
+
+  try {
+    localStorage.setItem('scheme_navigator_language', bcp47Code);
+  } catch {
+    // ignore
   }
 };
 
-/**
- * Initialize language from storage on first page load
- */
 export const initStoredLanguage = () => {
+  if (typeof window === 'undefined') return;
   try {
     const savedCode = localStorage.getItem('scheme_navigator_language');
-    if (savedCode && savedCode !== 'en-IN' && savedCode !== 'en') {
-      const shortCode = getShortLangCode(savedCode);
-      setGoogleTranslateCookie(savedCode);
-      
-      // Delay slightly for script initialization
-      let tries = 0;
-      const interval = setInterval(() => {
-        tries++;
-        const selectElem = document.querySelector('.goog-te-combo') as HTMLSelectElement | null;
-        if (selectElem) {
-          selectElem.value = shortCode;
-          selectElem.dispatchEvent(new Event('change', { bubbles: true }));
-          clearInterval(interval);
-        } else if (tries > 25) {
-          clearInterval(interval);
-        }
-      }, 200);
+    if (savedCode) {
+      applySiteLanguage(savedCode);
+    } else {
+      applySiteLanguage('en-IN');
     }
   } catch {
     // ignore
   }
 };
+

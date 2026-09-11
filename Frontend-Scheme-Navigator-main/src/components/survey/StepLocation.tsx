@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserProfile, AreaType } from '../../types';
 import { INDIAN_STATES, POPULAR_DISTRICTS } from '../../constants';
+import { useTranslation } from '../../hooks/useTranslation';
 import { MapPin, Building2, Trees, Landmark } from 'lucide-react';
 import { VoiceMicButton } from './VoiceMicButton';
 
@@ -11,25 +12,28 @@ interface StepLocationProps {
 }
 
 export const StepLocation: React.FC<StepLocationProps> = ({ profile, onChange, onOpenVoice }) => {
-  const currentState = profile.state || 'Haryana';
-  const availableDistricts = POPULAR_DISTRICTS[currentState] || ['Capital / Main District', 'North District', 'South District', 'Others'];
+  const { t, tp, tState } = useTranslation();
+  const currentState = profile.state || '';
+  const availableDistricts = currentState && POPULAR_DISTRICTS[currentState]
+    ? POPULAR_DISTRICTS[currentState]
+    : ['Capital / Main District', 'North District', 'South District', 'Others'];
 
   const areaOptions: { id: AreaType; label: string; desc: string; icon: React.ReactNode }[] = [
     {
       id: 'Urban',
-      label: 'Urban / Metro',
+      label: t('survey.urban'),
       desc: 'Municipal corporation, cities, or towns',
       icon: <Building2 className="w-5 h-5 text-blue-600" />,
     },
     {
       id: 'Rural',
-      label: 'Rural / Village',
+      label: t('survey.rural'),
       desc: 'Gram Panchayat, villages, farm areas',
       icon: <Trees className="w-5 h-5 text-emerald-600" />,
     },
     {
       id: 'Semi-Urban',
-      label: 'Semi-Urban',
+      label: tp('Semi-Urban'),
       desc: 'Suburban outgrowths, tehsils',
       icon: <Landmark className="w-5 h-5 text-purple-600" />,
     },
@@ -40,40 +44,41 @@ export const StepLocation: React.FC<StepLocationProps> = ({ profile, onChange, o
       <div>
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
-            Step 2 of 6 • Location & Domicile
+            {t('survey.stepOf', { step: 2, total: 6 })} {t('survey.stepLocation')}
           </span>
           {onOpenVoice && (
             <VoiceMicButton
               onClick={onOpenVoice}
               variant="pill"
-              label="Speak"
+              label={t('survey.speak')}
               sublabel="बोलें"
             />
           )}
         </div>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
-          Where are you located?
+          {t('survey.stepLocation')}
         </h2>
         <p className="text-sm text-slate-600 mt-1">
-          Some government schemes are available nationwide, while others are specific to your state or rural/urban locality.
+          {t('howItWorks.subtitle')}
         </p>
       </div>
 
       {/* State Dropdown */}
       <div className="space-y-2">
         <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          Select Your State / UT <span className="text-rose-500">*</span>
+          {t('survey.stateLabel')} <span className="text-rose-500">*</span>
         </label>
         <div className="relative">
           <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-teal-700" />
           <select
-            value={profile.state || 'Haryana'}
+            value={profile.state || ''}
             onChange={(e) => onChange({ state: e.target.value, district: '' })}
             className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border border-slate-300 focus:border-teal-600 focus:bg-white rounded-2xl text-slate-900 text-sm font-semibold outline-hidden transition-all appearance-none cursor-pointer"
           >
+            <option value="">-- {t('survey.select_state', undefined, 'Select Your State')} --</option>
             {INDIAN_STATES.filter((s) => s !== 'All India').map((st) => (
               <option key={st} value={st}>
-                {st}
+                {tState(st)}
               </option>
             ))}
           </select>
@@ -86,7 +91,7 @@ export const StepLocation: React.FC<StepLocationProps> = ({ profile, onChange, o
       {/* District Dropdown */}
       <div className="space-y-2">
         <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          District <span className="text-slate-500 font-normal">(Optional)</span>
+          {t('survey.districtLabel')} <span className="text-slate-500 font-normal">(Optional)</span>
         </label>
         <div className="relative">
           <select
@@ -94,7 +99,7 @@ export const StepLocation: React.FC<StepLocationProps> = ({ profile, onChange, o
             onChange={(e) => onChange({ district: e.target.value })}
             className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 focus:border-teal-600 focus:bg-white rounded-2xl text-slate-900 text-sm font-medium outline-hidden transition-all appearance-none cursor-pointer"
           >
-            <option value="">-- Select or skip district --</option>
+            <option value="">-- {t('survey.districtPlaceholder')} --</option>
             {availableDistricts.map((dst) => (
               <option key={dst} value={dst}>
                 {dst}
@@ -110,11 +115,11 @@ export const StepLocation: React.FC<StepLocationProps> = ({ profile, onChange, o
       {/* Area Type Cards */}
       <div className="space-y-3">
         <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-          Locality Type <span className="text-rose-500">*</span>
+          {t('survey.areaType')} <span className="text-rose-500">*</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {areaOptions.map((opt) => {
-            const isSelected = profile.areaType === opt.id || (!profile.areaType && opt.id === 'Urban');
+            const isSelected = profile.areaType === opt.id;
             return (
               <button
                 key={opt.id}
