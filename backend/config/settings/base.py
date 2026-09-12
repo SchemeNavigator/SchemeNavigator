@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / "api.env")
+if BASE_DIR.parent:
+    load_dotenv(BASE_DIR.parent / ".env")
+    load_dotenv(BASE_DIR.parent / "api.env")
 
 # ---------------------------------------------------------------------------
 # Security
@@ -170,13 +174,21 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # ---------------------------------------------------------------------------
-# LiteLLM / Agents
+# LiteLLM / Agents / Gemini
 # ---------------------------------------------------------------------------
-LITELLM_API_KEY = os.environ.get("LITELLM_API_KEY", "")
-LITELLM_API_BASE = os.environ.get("LITELLM_API_BASE", "")  # e.g. https://openrouter.ai/api/v1
-LITELLM_MODEL = os.environ.get("LITELLM_MODEL", "gpt-4o-mini")
-LITELLM_TEMPERATURE = float(os.environ.get("LITELLM_TEMPERATURE", "0.3"))
-LITELLM_MAX_TOKENS = int(os.environ.get("LITELLM_MAX_TOKENS", "1024"))
+_raw_key = (
+    os.environ.get("GEMINI_API_KEY", "")
+    or os.environ.get("GOOGLE_API_KEY", "")
+    or os.environ.get("LITELLM_API_KEY", "")
+).strip()
+if any(dummy in _raw_key for dummy in ["your-key-here", "placeholder", "..."]):
+    _raw_key = ""
+
+LITELLM_API_KEY = _raw_key
+LITELLM_API_BASE = os.environ.get("LITELLM_API_BASE", "").strip()
+LITELLM_MODEL = os.environ.get("LITELLM_MODEL", "gemini/gemini-1.5-flash").strip()
+LITELLM_TEMPERATURE = float(os.environ.get("LITELLM_TEMPERATURE", "0.4"))
+LITELLM_MAX_TOKENS = int(os.environ.get("LITELLM_MAX_TOKENS", "1200"))
 
 # ---------------------------------------------------------------------------
 # Government Scheme API Integration

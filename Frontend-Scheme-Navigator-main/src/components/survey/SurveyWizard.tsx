@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserProfile } from '../../types';
-import { getSavedProfile } from '../../services/storageService';
+import { getSavedProfile, saveUserProfile } from '../../services/storageService';
 import { useAppStore } from '../../store/appStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import { StepPersonal } from './StepPersonal';
@@ -128,11 +128,15 @@ export const SurveyWizard: React.FC = () => {
         return;
       }
 
-      try {
-        await submitSurvey(profile);
-      } catch (err) {
+      // Save user profile immediately to local storage
+      saveUserProfile(profile);
+
+      // Trigger survey submit non-blocking so button does not freeze
+      submitSurvey(profile).catch((err) => {
         console.warn('submitSurvey background error handled:', err);
-      }
+      });
+
+      // Instantly transition to analyzing screen without latency
       navigate('/analyzing');
     }
   };

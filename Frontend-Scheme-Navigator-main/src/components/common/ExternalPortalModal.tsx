@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { ExternalLink, ShieldCheck, AlertTriangle, X, CheckSquare } from 'lucide-react';
 import { Scheme } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -184,10 +185,15 @@ export const ExternalPortalModal: React.FC<ExternalPortalModalProps> = ({
 
   const targetUrl = getSafeOfficialUrl(scheme);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-lg my-auto bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
@@ -280,6 +286,7 @@ export const ExternalPortalModal: React.FC<ExternalPortalModalProps> = ({
           </a>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -177,11 +177,11 @@ export const ChatbotFAB: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsOpen(true)}
-            className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/95 backdrop-blur-md border border-teal-300 shadow-xl shadow-teal-950/15 text-xs font-extrabold text-teal-950 hover:bg-teal-50 transition-all hover:scale-105 cursor-pointer group animate-in slide-in-from-right-3"
+            className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-teal-300 dark:border-teal-700/60 shadow-xl shadow-teal-950/15 text-xs font-extrabold text-teal-950 dark:text-emerald-300 hover:bg-teal-50 dark:hover:bg-slate-800 transition-all hover:scale-105 cursor-pointer group animate-in slide-in-from-right-3"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>{isHindi ? 'मित्र AI से पूछें' : 'Ask Mitra AI'}</span>
-            <Sparkles className="w-3.5 h-3.5 text-teal-700 group-hover:rotate-12 transition-transform" />
+            <Sparkles className="w-3.5 h-3.5 text-teal-700 dark:text-emerald-400 group-hover:rotate-12 transition-transform" />
           </button>
         )}
 

@@ -58,3 +58,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Audio & TTS Cache
+*.mp3
+**/cache_tts/
+cache_tts/

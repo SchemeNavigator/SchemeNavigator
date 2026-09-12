@@ -87,12 +87,12 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-haspopup="true"
-          title={`Current Language: ${selectedLanguage.nativeName} (${selectedLanguage.name})`}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-all cursor-pointer ${className}`}
+          title={`Current Language: ${selectedLanguage.nativeName}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-2xs transition-all cursor-pointer ${className}`}
         >
-          <Globe className="w-3.5 h-3.5 text-teal-700" />
-          <span className="font-bold text-slate-900">{selectedLanguage.nativeName}</span>
-          <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <Globe className="w-3.5 h-3.5 text-teal-700 dark:text-emerald-400" />
+          <span className="font-bold text-slate-900 dark:text-white">{selectedLanguage.nativeName}</span>
+          <ChevronDown className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
       );
     }
@@ -104,16 +104,16 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-haspopup="true"
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100/80 border border-teal-200 text-teal-950 text-xs font-bold transition-all shadow-2xs cursor-pointer ${className}`}
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100/80 dark:hover:bg-teal-900/60 border border-teal-200 dark:border-teal-800 text-teal-950 dark:text-emerald-200 text-xs font-bold transition-all shadow-2xs cursor-pointer ${className}`}
         >
           <div className="w-5 h-5 rounded-md bg-teal-700 text-white flex items-center justify-center font-bold text-[10px]">
             {selectedLanguage.code.split('-')[0].toUpperCase()}
           </div>
           <div className="text-left flex flex-col">
-            <span className="text-[10px] text-teal-700 font-medium leading-none">Language / भाषा</span>
+            <span className="text-[10px] text-teal-700 dark:text-teal-400 font-medium leading-none">Language / भाषा</span>
             <span className="text-xs font-bold leading-tight">{selectedLanguage.nativeName}</span>
           </div>
-          <ChevronDown className={`w-3.5 h-3.5 text-teal-700 ml-1 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-3.5 h-3.5 text-teal-700 dark:text-teal-400 ml-1 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
       );
     }
@@ -128,7 +128,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer ${className}`}
         >
           <Globe className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{selectedLanguage.nativeName} ({selectedLanguage.name})</span>
+          <span>{selectedLanguage.nativeName}</span>
           <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
       );
@@ -142,24 +142,21 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         aria-expanded={isOpen}
         aria-haspopup="true"
         title="Change Language / भाषा बदलें"
-        className={`group inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200/90 bg-slate-50 hover:bg-white hover:border-teal-300 hover:shadow-xs transition-all text-slate-800 cursor-pointer ${
-          isOpen ? 'ring-2 ring-teal-500/20 border-teal-500 bg-white' : ''
+        className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-teal-300 dark:hover:border-teal-500/60 shadow-2xs hover:shadow-xs transition-all text-slate-800 dark:text-slate-100 cursor-pointer ${
+          isOpen ? 'ring-2 ring-teal-500/20 border-teal-500 bg-white dark:bg-slate-800 dark:border-teal-500/60' : ''
         } ${className}`}
       >
-        <div className="w-5 h-5 rounded-lg bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-teal-900 transition-colors">
+        <div className="w-5 h-5 rounded-lg bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-teal-900 dark:group-hover:bg-teal-600 transition-colors">
           <Languages className="w-3 h-3 text-emerald-300" />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="font-extrabold text-slate-900 text-xs tracking-tight">
+        <div className="flex items-center">
+          <span className="font-extrabold text-slate-900 dark:text-white text-xs tracking-tight">
             {selectedLanguage.nativeName}
-          </span>
-          <span className="text-[10px] text-slate-500 font-medium hidden lg:inline">
-            ({selectedLanguage.name.split(' ')[0]})
           </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-transform ${
-            isOpen ? 'rotate-180 text-teal-700' : ''
+          className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-transform ${
+            isOpen ? 'rotate-180 text-teal-700 dark:text-teal-400' : ''
           }`}
         />
       </button>
@@ -172,7 +169,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute z-50 mt-2 w-72 sm:w-80 rounded-2xl bg-white shadow-xl border border-slate-200/90 ring-1 ring-black/5 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 ${
+          className={`absolute z-50 mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 ${
             align === 'right' ? 'right-0' : 'left-0'
           }`}
         >
@@ -194,16 +191,16 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           </div>
 
           {/* Search Box */}
-          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
+          <div className="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search language or state..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10"
               />
             </div>
           </div>
@@ -211,7 +208,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           {/* Languages List */}
           <div className="max-h-72 overflow-y-auto p-1.5 space-y-1 divide-y-0">
             {filteredLanguages.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-500">
+              <div className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                 No language matching "{searchQuery}"
               </div>
             ) : (
@@ -224,8 +221,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     onClick={() => handleSelectLanguage(lang)}
                     className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-teal-50 border border-teal-200 text-teal-950 font-bold'
-                        : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                        ? 'bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-700/80 text-teal-950 dark:text-emerald-300 font-bold'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-transparent'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -233,21 +230,21 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                         className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
                           isSelected
                             ? 'bg-teal-700 text-white shadow-2xs'
-                            : 'bg-slate-100 text-slate-700'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
                         {lang.nativeName.slice(0, 1)}
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-xs text-slate-900">
+                          <span className="font-extrabold text-xs text-slate-900 dark:text-white">
                             {lang.nativeName}
                           </span>
-                          <span className="text-[11px] text-slate-500 font-medium">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                             • {lang.name}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-400 line-clamp-1">
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1">
                           {lang.region}
                         </p>
                       </div>
@@ -259,7 +256,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                           <Check className="w-3 h-3 stroke-[3]" />
                         </div>
                       ) : (
-                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-mono">
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono">
                           {lang.code.split('-')[0]}
                         </span>
                       )}
@@ -271,12 +268,12 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           </div>
 
           {/* Quick Info Footer */}
-          <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="flex items-center gap-1 text-[10px] text-teal-800 font-semibold">
-              <Sparkles className="w-3 h-3 text-teal-600" />
+          <div className="p-2.5 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1 text-[10px] text-teal-800 dark:text-emerald-400 font-semibold">
+              <Sparkles className="w-3 h-3 text-teal-600 dark:text-emerald-400" />
               Applies to Voice Survey & AI Advisor
             </span>
-            <span className="text-[10px] font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">
+            <span className="text-[10px] font-mono bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
               12 Languages
             </span>
           </div>

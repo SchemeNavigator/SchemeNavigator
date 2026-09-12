@@ -47,12 +47,14 @@ class AssistantChatView(APIView):
 
         history = request.data.get("history", [])
         profile = request.data.get("profile", None)
+        language = request.data.get("language", "en-IN")
 
         agent = AssistantAgent()
         result = agent.chat(
             history=history,
             message=message,
             current_profile=profile,
+            language=language,
         )
 
         answer = result["answer"]
@@ -73,4 +75,62 @@ class AssistantChatView(APIView):
                 "updatedProfile": updated_profile,
             }
         )
+
+
+class TTSView(APIView):
+    """
+    GET  /api/assistant/tts/?text=<text>&lang=<lang>&rate=<rate>
+    POST /api/assistant/tts/
+    Body: { "text": "<text>", "lang": "<lang>", "rate": 1.0 }
+
+    Returns MP3 audio stream of high-fidelity neural speech.
+    Zero credits used, disk-cached for instant sub-millisecond response.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        text = (request.query_params.get("text") or "").strip()
+        lang = (request.query_params.get("lang") or "or-IN").strip()
+        try:
+            rate = float(request.query_params.get("rate") or 1.0)
+        except (ValueError, TypeError):
+            rate = 1.0
+
+        if not text:
+            return Response({"error": "text parameter is required"}, status=400)
+
+        return self._synthesize(text, lang, rate)
+
+    def post(self, request):
+        text = (request.data.get("text") or "").strip()
+        lang = (request.data.get("lang") or "or-IN").strip()
+        try:
+            rate = float(request.data.get("rate") or 1.0)
+        except (ValueError, TypeError):
+            rate = 1.0
+
+        if not text:
+            return Response({"error": "text field is required"}, status=400)
+
+        return self._synthesize(text, lang, rate)
+
+    def _synthesize(self, text: str, lang: str, rate: float):
+        from django.http import HttpResponse
+        from asgiref.sync import async_to_sync
+        from .tts_service import synthesize_neural_speech
+
+        try:
+            audio_bytes = async_to_sync(synthesize_neural_speech)(text, lang, rate)
+            if not audio_bytes:
+                return Response({"error": "Failed to generate audio"}, status=500)
+
+            response = HttpResponse(audio_bytes, content_type="audio/mpeg")
+            response["Content-Length"] = str(len(audio_bytes))
+            response["Cache-Control"] = "public, max-age=86400"
+            return response
+        except Exception as e:
+            logger.error(f"TTSView synthesis error: {e}", exc_info=True)
+            return Response({"error": f"Speech synthesis failed: {str(e)}"}, status=500)
+
 

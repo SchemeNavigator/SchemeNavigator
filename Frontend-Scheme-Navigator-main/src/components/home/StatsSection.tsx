@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
-import { Sparkles, Info, ShieldCheck, Database, Languages, Award } from 'lucide-react';
+import { Sparkles, Info, ShieldCheck, Database, Languages } from 'lucide-react';
 
 export const StatsSection: React.FC = () => {
   const { t } = useTranslation();
@@ -10,28 +10,21 @@ export const StatsSection: React.FC = () => {
       icon: Database,
       value: '3,866+',
       label: t('stats.schemes'),
-      note: 'Central & State Ministries',
+      note: t('stats.centralState'),
       color: 'from-emerald-300 via-teal-200 to-white',
-    },
-    {
-      icon: Award,
-      value: '₹2.5L Cr+',
-      label: 'Annual Benefit Pool',
-      note: 'Direct DBT & Subsidies',
-      color: 'from-amber-200 via-yellow-100 to-white',
     },
     {
       icon: ShieldCheck,
       value: '100%',
       label: t('stats.free'),
-      note: 'No Middlemen, Direct Links',
+      note: t('stats.noMiddlemen'),
       color: 'from-cyan-300 via-teal-200 to-white',
     },
     {
       icon: Languages,
       value: '12+',
       label: t('trust.multilingual'),
-      note: 'Native Indian Languages',
+      note: t('stats.nativeLanguages'),
       color: 'from-purple-200 via-indigo-200 to-white',
     },
   ];
@@ -48,18 +41,18 @@ export const StatsSection: React.FC = () => {
         <div className="text-center max-w-3xl mx-auto mb-10 space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-900/80 border border-teal-500/40 text-emerald-300 text-xs font-bold shadow-xs">
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Scale & Trust At a Glance</span>
+            <span>{t('stats.scaleTrust')}</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
-            Empowering Every Indian Citizen
+            {t('stats.empowering')}
           </h2>
           <p className="text-sm sm:text-base text-teal-100/80 leading-relaxed font-normal">
-            Real-time coverage across all 28 states and 8 union territories for agriculture, education, business, healthcare, and welfare.
+            {t('stats.coverageDesc')}
           </p>
         </div>
 
         {/* Stats Grid */}
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           {stats.map((stat, idx) => {
             const Icon = stat.icon;
             return (

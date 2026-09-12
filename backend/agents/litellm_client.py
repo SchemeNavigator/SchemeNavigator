@@ -22,13 +22,24 @@ import os
 import logging
 from typing import Any, Optional
 
-import litellm
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Silence LiteLLM's verbose logging unless DEBUG
-litellm.set_verbose = getattr(settings, "DEBUG", False)
+
+def _sanitize_key(key: Optional[str], provider: str = "") -> Optional[str]:
+    """Sanitize API key and filter out dummy/placeholder values."""
+    if not key:
+        return None
+    cleaned = key.strip()
+    if any(dummy in cleaned.lower() for dummy in ["your-key-here", "placeholder", "...", "<", "none"]):
+        return None
+    if len(cleaned) < 15:
+        return None
+    # Google AI Studio Gemini keys start with "AIzaSy"
+    if provider == "gemini" and not cleaned.startswith("AIzaSy"):
+        return None
+    return cleaned
 
 
 def _resolve_api_credentials(model_name: str) -> tuple[Optional[str], Optional[str]]:
@@ -36,32 +47,39 @@ def _resolve_api_credentials(model_name: str) -> tuple[Optional[str], Optional[s
     Intelligently resolves API Key and API Base from environment / settings
     for the specific model provider.
     """
-    api_key = (
-        getattr(settings, "LITELLM_API_KEY", "")
-        or os.environ.get("LITELLM_API_KEY", "")
+    model_lower = model_name.lower()
+    provider = "gemini" if "gemini" in model_lower else "groq" if "groq" in model_lower else "openrouter" if "openrouter" in model_lower else ""
+
+    api_key = _sanitize_key(
+        getattr(settings, "LITELLM_API_KEY", None)
+        or os.environ.get("LITELLM_API_KEY"),
+        provider=provider
     )
     api_base = (
         getattr(settings, "LITELLM_API_BASE", "")
         or os.environ.get("LITELLM_API_BASE", "")
     )
 
-    model_lower = model_name.lower()
-
     # 1. Google Gemini
     if "gemini" in model_lower:
-        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        gemini_key = _sanitize_key(
+            os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY")
+            or api_key,
+            provider="gemini"
+        )
         if gemini_key:
             api_key = gemini_key
 
     # 2. Groq
     elif "groq" in model_lower:
-        groq_key = os.environ.get("GROQ_API_KEY")
+        groq_key = _sanitize_key(os.environ.get("GROQ_API_KEY"), provider="groq")
         if groq_key:
             api_key = groq_key
 
     # 3. OpenRouter Free Models
     elif "openrouter" in model_lower:
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        openrouter_key = _sanitize_key(os.environ.get("OPENROUTER_API_KEY"), provider="openrouter")
         if openrouter_key:
             api_key = openrouter_key
         if not api_base:
@@ -72,31 +90,47 @@ def _resolve_api_credentials(model_name: str) -> tuple[Optional[str], Optional[s
         if not api_base:
             api_base = os.environ.get("OLLAMA_API_BASE", "http://localhost:11434")
 
-    return (api_key.strip() if api_key else None), (api_base.strip() if api_base else None)
+    return (api_key if api_key else None), (api_base.strip() if api_base else None)
 
 
 def _call_gemini_direct(messages: list[dict], api_key: str, model_name: str, temperature: float, max_tokens: int) -> str:
     """Fast, direct HTTP request to Google Gemini API bypassing library wrappers."""
     import httpx
-    
+
     clean_model = model_name.replace("gemini/", "").replace("models/", "").strip()
-    if clean_model in ("gemini-flash-latest", "gemini-flash", "flash"):
+    if clean_model in ("gemini-flash-latest", "gemini-flash", "flash", "gemini-1.5-flash-latest"):
         clean_model = "gemini-1.5-flash"
+    elif clean_model in ("gemini-2.0-flash-latest", "gemini-2-flash"):
+        clean_model = "gemini-2.0-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
-    
+
     # Format messages for Gemini API
+    # Gemini requires strict alternating between 'user' and 'model'
     contents = []
     system_instruction = None
+
     for m in messages:
         role = m.get("role")
-        content = m.get("content", "")
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+
         if role == "system":
             system_instruction = {"parts": [{"text": content}]}
-        elif role == "assistant":
-            contents.append({"role": "model", "parts": [{"text": content}]})
+            continue
+
+        gemini_role = "model" if role == "assistant" else "user"
+
+        if contents and contents[-1]["role"] == gemini_role:
+            # Combine consecutive turns with identical role into one turn
+            contents[-1]["parts"][0]["text"] += "\n\n" + content
         else:
-            contents.append({"role": "user", "parts": [{"text": content}]})
-            
+            contents.append({"role": gemini_role, "parts": [{"text": content}]})
+
+    # Gemini requires the first turn to be 'user'
+    if contents and contents[0]["role"] != "user":
+        contents.insert(0, {"role": "user", "parts": [{"text": "Hello"}]})
+
     payload: dict[str, Any] = {
         "contents": contents,
         "generationConfig": {
@@ -106,8 +140,8 @@ def _call_gemini_direct(messages: list[dict], api_key: str, model_name: str, tem
     }
     if system_instruction:
         payload["systemInstruction"] = system_instruction
-        
-    with httpx.Client(timeout=4.0) as client:
+
+    with httpx.Client(timeout=8.0) as client:
         resp = client.post(url, json=payload)
         if resp.status_code == 200:
             data = resp.json()
@@ -137,6 +171,9 @@ def call_llm(
 
     _api_key, _api_base = _resolve_api_credentials(_model)
 
+    if not _api_key and not _api_base:
+        raise RuntimeError(f"No API key configured for model {_model}. Fast-falling back to local conversational engine.")
+
     # If it's a Gemini model with an API key, try direct fast caller first
     if "gemini" in _model.lower() and _api_key:
         try:
@@ -159,6 +196,8 @@ def call_llm(
         kwargs["response_format"] = response_format
 
     try:
+        import litellm
+        litellm.set_verbose = getattr(settings, "DEBUG", False)
         response = litellm.completion(**kwargs)
         return response.choices[0].message.content or ""
     except Exception as exc:

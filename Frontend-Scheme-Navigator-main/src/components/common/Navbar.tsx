@@ -10,6 +10,7 @@ import {
   Compass,
   Moon,
   Sun,
+  Volume2,
 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -17,10 +18,14 @@ import { LanguageSelector } from './LanguageSelector';
 
 export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { savedSchemeIds, handleCheckEligibility, startTour, theme, toggleTheme } = useAppStore();
+
+
+
+  const { savedSchemeIds, handleCheckEligibility, startTour, theme, toggleTheme, isVoiceReaderOpen, toggleVoiceReader } = useAppStore();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+
 
   const handleHowItWorksClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -94,8 +99,8 @@ export const Navbar: React.FC = () => {
               className={({ isActive }) =>
                 `px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 relative group ${
                   isActive
-                    ? 'text-white bg-gradient-to-r from-teal-800 to-slate-950 dark:from-teal-700 dark:to-slate-900 shadow-xs'
-                    : 'text-teal-900 dark:text-emerald-300 bg-teal-100/70 dark:bg-teal-950/60 hover:bg-teal-200/70 dark:hover:bg-teal-900/60 border border-teal-300/60 dark:border-teal-700/60'
+                    ? 'text-white bg-gradient-to-r from-teal-800 to-slate-950 dark:from-teal-700 dark:to-emerald-950 shadow-xs border border-transparent dark:border-emerald-600/40'
+                    : 'text-teal-900 dark:text-emerald-300 bg-teal-100/70 dark:bg-emerald-950/50 hover:bg-teal-200/70 dark:hover:bg-emerald-900/60 border border-teal-300/60 dark:border-emerald-700/60'
                 }`
               }
             >
@@ -149,8 +154,26 @@ export const Navbar: React.FC = () => {
                 <span className="hidden xl:inline">{t('nav.tour')}</span>
               </button>
 
+              {/* Universal Page Voice Reader Button */}
+              <button
+                type="button"
+                onClick={toggleVoiceReader}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-3xs hover:shadow-xs ${
+                  isVoiceReaderOpen
+                    ? 'bg-gradient-to-r from-teal-700 to-emerald-700 text-white shadow-sm ring-2 ring-teal-400/40'
+                    : 'text-teal-800 dark:text-emerald-300 hover:bg-white dark:hover:bg-slate-800'
+                }`}
+                title="Listen to this page (Voice Reader)"
+                aria-label="Toggle Page Voice Reader"
+              >
+                <Volume2 className={`w-3.5 h-3.5 ${isVoiceReaderOpen ? 'animate-bounce text-emerald-200' : 'text-teal-600 dark:text-emerald-400'}`} />
+                <span className="hidden xl:inline">{t('nav.voiceReader', undefined, 'Voice Reader')}</span>
+              </button>
+
               {/* Language Selector Dropdown */}
               <LanguageSelector variant="navbar" align="right" />
+
+
 
               {/* Bookmarks Icon */}
               <Link
@@ -261,8 +284,8 @@ export const Navbar: React.FC = () => {
               className={({ isActive }) =>
                 `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-bold ${
                   isActive
-                    ? 'bg-teal-900 dark:bg-teal-900 text-white shadow-xs'
-                    : 'bg-teal-50 dark:bg-teal-950/50 text-teal-900 dark:text-emerald-300'
+                    ? 'bg-teal-900 dark:bg-teal-800 text-white shadow-xs'
+                    : 'bg-teal-50 dark:bg-emerald-950/50 text-teal-900 dark:text-emerald-300 border border-teal-200/60 dark:border-emerald-700/60'
                 }`
               }
             >
@@ -306,6 +329,8 @@ export const Navbar: React.FC = () => {
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </NavLink>
 
+
+
             <button
               type="button"
               onClick={() => {
@@ -319,6 +344,24 @@ export const Navbar: React.FC = () => {
                 <span>{t('nav.tour')} ✨</span>
               </div>
               <ChevronRight className="w-4 h-4 text-teal-500" />
+            </button>
+
+            {/* Mobile Voice Reader Row */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                toggleVoiceReader();
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-bold text-teal-900 dark:text-emerald-300 bg-teal-50/80 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors cursor-pointer border border-teal-200/60 dark:border-teal-800/60"
+            >
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 text-teal-600 dark:text-emerald-400" />
+                <span>{t('nav.voiceReader', undefined, 'Voice Reader (Listen to Page)')}</span>
+              </div>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200">
+                {isVoiceReaderOpen ? 'Active' : 'Open'}
+              </span>
             </button>
 
             {/* Mobile Theme Switcher Row */}
@@ -358,6 +401,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       )}
+
     </header>
   );
 };

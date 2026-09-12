@@ -109,7 +109,7 @@ export const SchemeFilterBar: React.FC<SchemeFilterBarProps> = ({
             Object.values(categoryCounts).reduce(
               (acc, c) => acc + (typeof c === 'number' ? c : 0),
               0
-            ) || 3866;
+            );
 
           return (
             <button
@@ -135,7 +135,7 @@ export const SchemeFilterBar: React.FC<SchemeFilterBarProps> = ({
         })()}
 
         {SCHEME_CATEGORIES.map((cat) => {
-          const count = categoryCounts[cat];
+          const count = categoryCounts[cat] ?? 0;
           return (
             <button
               key={cat}
@@ -147,13 +147,11 @@ export const SchemeFilterBar: React.FC<SchemeFilterBarProps> = ({
               }`}
             >
               <span>{tCategory(cat)}</span>
-              {count !== undefined && (
-                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-                  selectedCategory === cat ? 'bg-teal-700 text-teal-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}>
-                  {count}
-                </span>
-              )}
+              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                selectedCategory === cat ? 'bg-teal-700 text-teal-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}>
+                {count}
+              </span>
             </button>
           );
         })}

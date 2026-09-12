@@ -36,11 +36,11 @@ export const AnalyzingPage: React.FC = () => {
           // Redirect after completion
           setTimeout(() => {
             navigate('/recommendations');
-          }, 1000);
+          }, 200);
           return prev;
         }
       });
-    }, 700);
+    }, 220);
 
     return () => clearInterval(interval);
   }, [navigate]);

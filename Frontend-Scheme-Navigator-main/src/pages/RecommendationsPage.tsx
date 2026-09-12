@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getSavedProfile } from '../services/storageService';
+import { getSavedProfile, getCachedRecommendations } from '../services/storageService';
+import { useAppStore } from '../store/appStore';
 import { SchemeCard } from '../components/schemes/SchemeCard';
 import { SchemeFilterBar } from '../components/schemes/SchemeFilterBar';
 import { api } from '../services/api';
@@ -195,8 +196,24 @@ const CollapsibleGroup: React.FC<{ group: CategoryGroup; onSaveChange: () => voi
 
 export const RecommendationsPage: React.FC = () => {
   const { t, tp, tCategory, tState, tOccupation } = useTranslation();
+  const { recommendations: storeRecommendations } = useAppStore();
   const [profile, setProfile] = useState(() => getSavedProfile() || {});
-  const [apiResults, setApiResults] = useState<any[]>([]);
+
+  // Initialize immediately from store recommendations or persistent cache (0ms delay)
+  const [apiResults, setApiResults] = useState<any[]>(() => {
+    if (storeRecommendations && storeRecommendations.length > 0) {
+      return storeRecommendations;
+    }
+    const cached = getCachedRecommendations();
+    if (cached && cached.length > 0) {
+      return cached;
+    }
+    return [];
+  });
+
+  // Only show loading if we don't already have recommendations
+  const [isLoading, setIsLoading] = useState<boolean>(() => apiResults.length === 0);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState<number>(20);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -222,11 +239,30 @@ export const RecommendationsPage: React.FC = () => {
     return () => window.removeEventListener('sn_profile_updated', handleProfileUpdate);
   }, []);
 
+  // Sync when store recommendations update from survey submission in background
+  useEffect(() => {
+    if (storeRecommendations && storeRecommendations.length > 0) {
+      setApiResults(storeRecommendations);
+      setIsLoading(false);
+    }
+  }, [storeRecommendations]);
+
   useEffect(() => {
     let isMounted = true;
+    if (apiResults.length === 0) {
+      setIsLoading(true);
+    }
     api.getRecommendations(profile).then((res) => {
-      if (isMounted && res && res.length > 0) {
-        setApiResults(res);
+      if (isMounted) {
+        if (res && res.length > 0) {
+          setApiResults(res);
+        }
+        setIsLoading(false);
+      }
+    }).catch((err) => {
+      console.warn('getRecommendations background error handled:', err);
+      if (isMounted) {
+        setIsLoading(false);
       }
     });
     return () => {
@@ -281,6 +317,36 @@ export const RecommendationsPage: React.FC = () => {
     return groupSchemesByOccupation(sortedResults, effectiveOccupation as string, tp);
   }, [isGrouped, sortedResults, effectiveOccupation, tp]);
 
+  // Dynamic category counts matching the active state, search, and score filters
+  const dynamicCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    apiResults.forEach((res) => {
+      const s = res.scheme;
+      if (!s) return;
+      const q = searchQuery.trim().toLowerCase();
+
+      const matchesSearch =
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.tagline.toLowerCase().includes(q) ||
+        s.verification?.ministryOrAuthority?.toLowerCase().includes(q) ||
+        (Array.isArray(s.tags) && s.tags.some((t: string) => t.toLowerCase().includes(q)));
+
+      const matchesState =
+        selectedState === 'All India' ||
+        s.coveredStates.includes('All India') ||
+        s.coveredStates.includes(selectedState);
+
+      const matchesScore = res.matchScore >= minMatchScore;
+
+      if (matchesSearch && matchesState && matchesScore) {
+        counts[s.category] = (counts[s.category] || 0) + 1;
+      }
+    });
+
+    return counts;
+  }, [apiResults, searchQuery, selectedState, minMatchScore]);
+
   return (
     <div className="bg-slate-50/80 dark:bg-slate-950 min-h-screen py-6 sm:py-8 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -317,13 +383,15 @@ export const RecommendationsPage: React.FC = () => {
             </div>
           </div>
 
-          <Link
-            to="/survey"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-teal-900 dark:hover:text-teal-300 border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 text-xs font-bold transition-all shrink-0 self-start md:self-center cursor-pointer"
-          >
-            <Edit3 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-            <span>{t('recommendations.edit_profile_btn', undefined, 'Edit Profile')}</span>
-          </Link>
+          <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+            <Link
+              to="/survey"
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-teal-900 dark:hover:text-teal-300 border border-slate-200 dark:border-slate-700 hover:border-teal-300 dark:hover:border-teal-600 text-xs font-bold transition-all shrink-0 cursor-pointer"
+            >
+              <Edit3 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+              <span>{t('recommendations.edit_profile_btn', undefined, 'Edit Profile')}</span>
+            </Link>
+          </div>
         </div>
 
         {/* Informational Match Disclaimer */}
@@ -347,15 +415,23 @@ export const RecommendationsPage: React.FC = () => {
           minMatchScore={minMatchScore}
           onMinScoreChange={setMinMatchScore}
           showMatchFilter={true}
+          categoryCounts={dynamicCategoryCounts}
         />
 
         {/* Match Count Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold text-slate-600 dark:text-slate-400 px-1">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-100/80 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 font-extrabold text-sm border border-teal-200 dark:border-teal-800">
-              <Sparkles className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-              <span>{sortedResults.length} {sortedResults.length === 1 ? 'Scheme' : 'Schemes'} Found For You</span>
-            </span>
+            {isLoading ? (
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-teal-100/80 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 font-extrabold text-sm border border-teal-200 dark:border-teal-800 animate-pulse">
+                <div className="w-3.5 h-3.5 border-2 border-teal-600 dark:border-teal-400 border-t-transparent rounded-full animate-spin" />
+                <span>{tp('Analyzing verified schemes for you...')}</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-100/80 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 font-extrabold text-sm border border-teal-200 dark:border-teal-800">
+                <Sparkles className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                <span>{sortedResults.length} {sortedResults.length === 1 ? 'Scheme' : 'Schemes'} Found For You</span>
+              </span>
+            )}
             <span className="text-slate-500 dark:text-slate-400 font-medium hidden md:inline">
               (Ranked by AI & eligibility fit)
             </span>
@@ -369,7 +445,35 @@ export const RecommendationsPage: React.FC = () => {
         </div>
 
         {/* Schemes Results */}
-        {sortedResults.length > 0 ? (
+        {isLoading ? (
+          /* Loading Skeletons - Prevents flashing 0 schemes or empty state */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((idx) => (
+              <div
+                key={idx}
+                className="rounded-3xl bg-white dark:bg-slate-900 p-6 sm:p-7 border border-slate-200/90 dark:border-slate-800 shadow-sm animate-pulse space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-6 w-24 bg-slate-200 dark:bg-slate-800 rounded-full" />
+                  <div className="h-6 w-16 bg-slate-200 dark:bg-slate-800 rounded-full" />
+                </div>
+                <div className="space-y-2 pt-2">
+                  <div className="h-5 w-4/5 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+                  <div className="h-4 w-full bg-slate-100 dark:bg-slate-800/60 rounded-md" />
+                  <div className="h-4 w-2/3 bg-slate-100 dark:bg-slate-800/60 rounded-md" />
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 space-y-2">
+                  <div className="h-3 w-1/3 bg-slate-200 dark:bg-slate-700 rounded" />
+                  <div className="h-4 w-full bg-slate-200 dark:bg-slate-700 rounded" />
+                </div>
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="h-9 w-28 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+                  <div className="h-9 w-28 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : sortedResults.length > 0 ? (
           <div className="space-y-8">
             {/* Grid of Top Schemes (Showing first 20 by default) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -406,15 +510,15 @@ export const RecommendationsPage: React.FC = () => {
           </div>
         ) : (
           /* Empty State - Clear "No Schemes For You" Message */
-          <div className="bg-white rounded-3xl p-10 sm:p-16 border border-slate-200 text-center space-y-5 shadow-sm max-w-2xl mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 sm:p-16 border border-slate-200 dark:border-slate-800 text-center space-y-5 shadow-sm max-w-2xl mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto shadow-inner">
               <AlertCircle className="w-8 h-8" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
                 No schemes found for you
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
                 We could not find active government schemes matching your current profile parameters. You can recalibrate your details or browse the complete nationwide catalog.
               </p>
             </div>
@@ -433,13 +537,13 @@ export const RecommendationsPage: React.FC = () => {
                   setMinMatchScore(0);
                   setSearchQuery('');
                 }}
-                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                className="px-5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 {t('explore.reset_filters', undefined, 'Reset Filters')}
               </button>
               <Link
                 to="/explore"
-                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors"
+                className="px-5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition-colors"
               >
                 {t('recommendations.explore_all_btn', undefined, 'Explore All Schemes Directory')}
               </Link>

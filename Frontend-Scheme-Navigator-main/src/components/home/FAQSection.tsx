@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 
 export const FAQSection: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
-  const { t } = useTranslation();
+  const { t, tp } = useTranslation();
 
   const toggle = (idx: number) => {
     setOpenIndex(openIndex === idx ? null : idx);
@@ -42,7 +42,7 @@ export const FAQSection: React.FC = () => {
                   onClick={() => toggle(idx)}
                   className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 font-bold text-slate-900 dark:text-white text-xs sm:text-sm hover:text-teal-800 dark:hover:text-teal-400 transition-colors cursor-pointer"
                 >
-                  <span>{faq.q}</span>
+                  <span>{tp(faq.q)}</span>
                   <ChevronDown
                     className={`w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0 transition-transform duration-200 ${
                       isOpen ? 'rotate-180 text-teal-700 dark:text-teal-400' : ''
@@ -52,7 +52,7 @@ export const FAQSection: React.FC = () => {
 
                 {isOpen && (
                   <div className="px-4 sm:px-5 pb-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-200/60 dark:border-slate-800 pt-3 animate-in fade-in duration-150">
-                    {faq.a}
+                    {tp(faq.a)}
                   </div>
                 )}
               </div>

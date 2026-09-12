@@ -1,4 +1,11 @@
-import { UserProfile, TrackerItem, ApplicationStatus, SchemeCategory, Scheme } from '../types';
+import {
+  UserProfile,
+  TrackerItem,
+  ApplicationStatus,
+  SchemeCategory,
+  Scheme,
+  SchemeMatchResult,
+} from '../types';
 
 const STORAGE_KEYS = {
   PROFILE: 'sn_user_profile_v2',
@@ -6,6 +13,7 @@ const STORAGE_KEYS = {
   SAVED_SCHEME_OBJS: 'sn_saved_scheme_objs_v2',
   TRACKER: 'sn_tracker_items_v2',
   AUTH: 'sn_auth_user_v2',
+  RECOMMENDATIONS: 'sn_cached_recommendations_v2',
 };
 
 // Safe helper to read JSON from localStorage
@@ -103,6 +111,16 @@ export function calculateProfileCompletion(profile: UserProfile | null): number 
   if (profile.incomeRange || profile.annualIncome !== undefined) score += 15;
 
   return Math.min(100, Math.max(0, score));
+}
+
+// ── Cached Recommendations ──────────────────────────────────────────────────
+
+export function getCachedRecommendations(): SchemeMatchResult[] {
+  return readFromStorage<SchemeMatchResult[]>(STORAGE_KEYS.RECOMMENDATIONS, []);
+}
+
+export function saveCachedRecommendations(recommendations: SchemeMatchResult[]): void {
+  writeToStorage(STORAGE_KEYS.RECOMMENDATIONS, recommendations);
 }
 
 // ── Saved Schemes ─────────────────────────────────────────────────────────────
@@ -340,3 +358,5 @@ export function logoutUser(): void {
 }
 
 export const logoutMockUser = logoutUser;
+
+

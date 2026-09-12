@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/common/Navbar';
+import { GlobalVoiceReader } from '../components/common/GlobalVoiceReader';
 import { Footer } from '../components/common/Footer';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 import { ChatbotFAB } from '../components/common/ChatbotFAB';
@@ -22,6 +23,9 @@ export const RootLayout: React.FC = () => {
 
       {/* Primary Sticky Header */}
       <Navbar />
+
+      {/* Global Universal Page Voice Reader (Docked at top / floating) */}
+      <GlobalVoiceReader />
 
       {/* Main Page Body */}
       <main className="flex-1 w-full max-w-full overflow-x-hidden pb-16 md:pb-0">
