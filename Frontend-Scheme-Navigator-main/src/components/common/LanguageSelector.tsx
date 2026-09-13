@@ -142,12 +142,12 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         aria-expanded={isOpen}
         aria-haspopup="true"
         title="Change Language / भाषा बदलें"
-        className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-teal-300 dark:hover:border-teal-500/60 shadow-2xs hover:shadow-xs transition-all text-slate-800 dark:text-slate-100 cursor-pointer ${
+        className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-teal-300 dark:hover:border-teal-500/60 shadow-2xs hover:shadow-xs transition-all text-slate-800 dark:text-slate-100 cursor-pointer ${
           isOpen ? 'ring-2 ring-teal-500/20 border-teal-500 bg-white dark:bg-slate-800 dark:border-teal-500/60' : ''
         } ${className}`}
       >
-        <div className="w-5 h-5 rounded-lg bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-teal-900 dark:group-hover:bg-teal-600 transition-colors">
-          <Languages className="w-3 h-3 text-emerald-300" />
+        <div className="w-4 h-4 rounded-full bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-teal-900 dark:group-hover:bg-teal-600 transition-colors">
+          <Languages className="w-2.5 h-2.5 text-emerald-300" />
         </div>
         <div className="flex items-center">
           <span className="font-extrabold text-slate-900 dark:text-white text-xs tracking-tight">

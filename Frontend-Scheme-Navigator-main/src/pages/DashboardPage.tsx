@@ -22,7 +22,11 @@ import {
   Clock,
   CheckCircle2,
   PlusCircle,
+  Store,
+  MapPin,
+  Calendar,
 } from 'lucide-react';
+import { KendraFinderModal } from '../components/kendra/KendraFinderModal';
 
 export const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -33,6 +37,7 @@ export const DashboardPage: React.FC = () => {
   const [authUser, setAuthUser] = useState(getAuthUser());
   const [totalCatalogCount, setTotalCatalogCount] = useState<number>(3866);
   const [draggedScheme, setDraggedScheme] = useState<Scheme | null>(null);
+  const [isKendraModalOpen, setIsKendraModalOpen] = useState(false);
   const trackerRef = useRef<HTMLDivElement>(null);
 
   const [isFloatingDropOver, setIsFloatingDropOver] = useState(false);
@@ -243,6 +248,35 @@ export const DashboardPage: React.FC = () => {
           />
         </div>
 
+        {/* Nearest Kendra Finder & CSC Physical Facilitation Card */}
+        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-950 rounded-3xl p-6 sm:p-7 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+          <div className="space-y-2 max-w-2xl relative z-10">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+              <Store className="w-3.5 h-3.5" />
+              <span>Offline Assistance • CSC / e-Mitra / MeeSeva Locator</span>
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight">
+              Nearest Kendra Finder (CSC / e-Mitra Locator)
+            </h3>
+
+            <p className="text-xs sm:text-sm text-teal-100/90 leading-relaxed">
+              Find verified Common Service Centers near {profile?.state ? profile.state : 'your location'} for in-person biometric e-KYC, Aadhaar authentication, and direct scheme application assistance.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 relative z-10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsKendraModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer hover:scale-102"
+            >
+              <MapPin className="w-4 h-4" />
+              <span>Locate Nearby Kendras</span>
+            </button>
+          </div>
+        </div>
+
         {/* 3. Saved Schemes Section */}
         <div id="saved" className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm">
           <SavedSchemesManager
@@ -296,6 +330,12 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Kendra Locator Modal */}
+      <KendraFinderModal
+        isOpen={isKendraModalOpen}
+        onClose={() => setIsKendraModalOpen(false)}
+      />
     </div>
   );
 };

@@ -22,7 +22,13 @@ import {
   ShieldCheck,
   ExternalLink,
   Loader2,
+  Store,
+  MapPin,
+  Navigation,
+  FileCheck,
 } from 'lucide-react';
+import { DeadlineTicker } from '../components/calendar/DeadlineTicker';
+import { KendraFinderModal } from '../components/kendra/KendraFinderModal';
 
 export const SchemeDetailPage: React.FC = () => {
   const { t, langCode } = useTranslation();
@@ -32,6 +38,7 @@ export const SchemeDetailPage: React.FC = () => {
   const [related, setRelated] = useState<Scheme[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isKendraModalOpen, setIsKendraModalOpen] = useState(false);
   const [, setForceUpdate] = useState(0);
 
   const userProfile = getSavedProfile();
@@ -172,6 +179,9 @@ export const SchemeDetailPage: React.FC = () => {
           {/* Voice Reader Audio Player for Scheme Information */}
           <VoiceReaderBar scheme={activeScheme} />
 
+          {/* Scheme Application Deadline Urgency & Countdown Ticker */}
+          <DeadlineTicker scheme={activeScheme} variant="card" />
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Main Column (8 Cols) */}
             <div className="lg:col-span-8 space-y-8">
@@ -243,6 +253,29 @@ export const SchemeDetailPage: React.FC = () => {
 
             {/* Sidebar Column (4 Cols) */}
             <div className="lg:col-span-4 space-y-6 sticky top-24">
+              {/* Nearest Kendra & 1-Click Printable Checklist Card */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  <Store className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                  <span>Offline Kendra & CSC Assistance</span>
+                </div>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Need in-person support? Visit an authorized Common Service Centre (CSC), e-Mitra, or MeeSeva for biometric e-KYC and offline form filling.
+                </p>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsKendraModalOpen(true)}
+                    className="w-full py-2.5 px-4 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <MapPin className="w-4 h-4 text-emerald-300" />
+                    <span>Find Nearest Kendra Centers</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Explainability Box ("Why It Was Recommended To You") */}
               <ExplainabilityBox scheme={activeScheme} userProfile={userProfile} />
 
@@ -321,6 +354,13 @@ export const SchemeDetailPage: React.FC = () => {
           scheme={scheme}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
+        />
+
+        {/* Kendra Finder Modal */}
+        <KendraFinderModal
+          isOpen={isKendraModalOpen}
+          onClose={() => setIsKendraModalOpen(false)}
+          preselectedScheme={activeScheme}
         />
       </div>
     </ErrorBoundary>

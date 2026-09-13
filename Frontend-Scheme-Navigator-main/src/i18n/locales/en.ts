@@ -180,6 +180,7 @@ export const enTranslations: Record<string, string> = {
   'modal.target_website': 'Target Website:',
   'nav.about': 'About',
   'nav.aiAdvisor': 'Mitra AI',
+  'nav.check': 'Check',
   'nav.checkEligibility': 'Check Eligibility',
   'nav.dashboard': 'Dashboard & Tracker',
   'nav.explore': 'Explore Schemes',

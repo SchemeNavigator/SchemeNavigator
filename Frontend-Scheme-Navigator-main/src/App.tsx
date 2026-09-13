@@ -15,6 +15,7 @@ const ExplorePage = lazy(() => import('./pages/ExplorePage').then((m) => ({ defa
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const AssistantPage = lazy(() => import('./pages/AssistantPage').then((m) => ({ default: m.AssistantPage })));
 const AboutPage = lazy(() => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })));
+const KendraFinderPage = lazy(() => import('./pages/KendraFinderPage').then((m) => ({ default: m.KendraFinderPage })));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/TermsPage').then((m) => ({ default: m.TermsPage })));
 
@@ -46,6 +47,7 @@ export function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/assistant" element={<AssistantPage />} />
                 <Route path="/about" element={<AboutPage />} />
+                <Route path="/kendra-finder" element={<KendraFinderPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

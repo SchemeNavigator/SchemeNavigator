@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Scheme } from '../../types';
 import { StatusPill } from '../common/StatusPill';
 import { Link } from 'react-router-dom';
-import { Bookmark, ArrowRight, Trash2, GripVertical, Check, Plus } from 'lucide-react';
+import { Bookmark, ArrowRight, Trash2, GripVertical, Check, Plus, Calendar } from 'lucide-react';
 import { toggleSaveScheme, addSchemeToTracker } from '../../services/storageService';
 import { useTranslation } from '../../hooks/useTranslation';
+import { DeadlineTicker } from '../calendar/DeadlineTicker';
+import { YojanaCalendarModal } from '../calendar/YojanaCalendarModal';
 
 interface SavedSchemesManagerProps {
   schemes: Scheme[];
@@ -22,6 +24,7 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
   onDragEnd,
 }) => {
   const { t } = useTranslation();
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   const handleRemove = (id: string) => {
     toggleSaveScheme(id);
@@ -56,7 +59,7 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
             {t('dashboard.saved_title', undefined, 'Bookmarked & Saved Schemes')}
@@ -65,9 +68,20 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
             {t('dashboard.saved_subtitle', undefined, 'Drag a scheme card into the Guidance Tracker above or click "+ Track" to start monitoring your application milestones.')}
           </p>
         </div>
-        <span className="text-xs font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 px-2.5 py-1 rounded-lg border border-teal-200 dark:border-teal-800">
-          {schemes.length} {t('dashboard.saved_badge', undefined, 'Saved')}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCalendarModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 transition-colors cursor-pointer"
+            title="Open Yojana Application Calendar for saved schemes"
+          >
+            <Calendar className="w-3.5 h-3.5 text-teal-600" />
+            <span>Yojana Calendar</span>
+          </button>
+          <span className="text-xs font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 px-2.5 py-1 rounded-lg border border-teal-200 dark:border-teal-800">
+            {schemes.length} {t('dashboard.saved_badge', undefined, 'Saved')}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -119,6 +133,10 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
                 <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                   {scheme.shortDescription || (scheme as any)?.description || scheme.tagline}
                 </p>
+
+                <div className="pt-1">
+                  <DeadlineTicker scheme={scheme} variant="badge" />
+                </div>
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
@@ -159,6 +177,13 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
           );
         })}
       </div>
+
+      {/* Yojana Calendar Modal for Saved Schemes */}
+      <YojanaCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        schemes={schemes}
+      />
     </div>
   );
 };
