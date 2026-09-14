@@ -25,7 +25,9 @@ import {
   Users,
   ChevronDown,
   ArrowRight,
+  Calendar,
 } from 'lucide-react';
+import { YojanaCalendarModal } from '../components/calendar/YojanaCalendarModal';
 
 // ─── Occupation → Primary + secondary category priority map ──────────────────
 const OCCUPATION_CATEGORY_MAP: Record<string, { primary: SchemeCategory[]; secondary: SchemeCategory[] }> = {
@@ -221,6 +223,7 @@ export const RecommendationsPage: React.FC = () => {
   const [selectedState, setSelectedState] = useState(profile.state || 'All India');
   const [sortBy, setSortBy] = useState('relevance');
   const [minMatchScore, setMinMatchScore] = useState(0);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [, setForceUpdate] = useState(0);
 
   useEffect(() => {
@@ -397,6 +400,37 @@ export const RecommendationsPage: React.FC = () => {
           </p>
         </div>
 
+        {/* Yojana Calendar & Deadline Urgency Alerts Banner */}
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-teal-500/10 to-emerald-500/10 dark:from-amber-950/40 dark:via-teal-950/40 dark:to-emerald-950/40 border border-amber-300/80 dark:border-amber-700/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  Yojana Calendar & Deadline Alerts
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                  Live Tickers
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                Monitor approaching deadlines, scholarship cutoffs, and 1-Click .ics iCalendar synchronization for your recommended schemes.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCalendarModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            <Calendar className="w-4 h-4 text-emerald-300" />
+            <span>Open Yojana Calendar</span>
+          </button>
+        </div>
+
         {/* Filter Bar */}
         <SchemeFilterBar
           searchQuery={searchQuery}
@@ -565,6 +599,13 @@ export const RecommendationsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Yojana Calendar Modal for Recommendations */}
+      <YojanaCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        schemes={matchResults.map((m) => m.scheme)}
+      />
     </div>
   );
 };

@@ -180,6 +180,7 @@ export const hiTranslations: Record<string, string> = {
   'modal.target_website': 'लक्षित वेबसाइट:',
   'nav.about': 'हमारे बारे में',
   'nav.aiAdvisor': 'मित्र AI',
+  'nav.check': 'जांचें',
   'nav.checkEligibility': 'पात्रता जांचें',
   'nav.dashboard': 'डैशबोर्ड व ट्रैकर',
   'nav.explore': 'सरकारी योजनाएं खोजें',

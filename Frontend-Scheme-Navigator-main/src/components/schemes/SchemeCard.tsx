@@ -18,6 +18,7 @@ import { isSchemeSaved, toggleSaveScheme } from '../../services/storageService';
 import { getSafeOfficialUrl } from '../common/ExternalPortalModal';
 import { useTranslation } from '../../hooks/useTranslation';
 import { translateSchemeContent } from '../../utils/schemeTranslator';
+import { DeadlineTicker } from '../calendar/DeadlineTicker';
 
 interface SchemeCardProps {
   matchResult: SchemeMatchResult;
@@ -54,9 +55,10 @@ export const SchemeCard: React.FC<SchemeCardProps> = ({ matchResult, onSaveChang
       <div className="space-y-4">
         {/* Top Meta Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusPill type="category" value={activeScheme.category || 'General'} size="sm" />
             <StatusPill type="level" value={activeScheme.level || 'Central'} size="sm" />
+            <DeadlineTicker scheme={activeScheme} variant="badge" />
           </div>
 
           <div className="flex items-center gap-2">

@@ -17,7 +17,6 @@ dist-ssr/
 *.local
 .env.local
 .env.*.local
-api.env
 
 # Python
 __pycache__/
@@ -46,6 +45,10 @@ venv.bak/
 !**/.env.example
 !.env.local.example
 !**/.env.local.example
+!api.env
+!**/api.env
+!Frontend-Scheme-Navigator-main/.env
+!Frontend-Scheme-Navigator-main/.env.production
 
 # OS / IDE
 .DS_Store
@@ -58,3 +61,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Audio & TTS Cache
+*.mp3
+**/cache_tts/
+cache_tts/

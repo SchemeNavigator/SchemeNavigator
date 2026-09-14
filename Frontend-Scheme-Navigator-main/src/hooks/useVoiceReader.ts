@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
+import { API_BASE_URL } from '../services/api';
 
 export interface UseVoiceReaderOptions {
   defaultRate?: number;
@@ -142,16 +143,37 @@ export function convertOdiaNumbersToWords(text: string): string {
   // 1. Odia numerals ୦-୯ to standard 0-9
   let s = text.replace(/[\u0b66-\u0b6f]/g, (ch) => String(ch.charCodeAt(0) - 0x0b66));
 
-  // 2. Remove commas inside numbers (e.g. 3,500 -> 3500)
+  // 2. Remove commas inside numbers (e.g. 3,866 -> 3866)
   s = s.replace(/(\d+),(\d+)/g, '$1$2');
 
-  // 3. Percentages e.g. 100% -> 100 ପ୍ରତିଶତ
-  s = s.replace(/(\d+)\s*%/g, '$1 ପ୍ରତିଶତ');
+  // 3. Indian Rupee symbol with Lakhs/Crores e.g. ₹20L -> 20 ଲକ୍ଷ ଟଙ୍କା, ₹1.30 Lakh -> 1.30 ଲକ୍ଷ ଟଙ୍କା
+  s = s.replace(/₹\s*(\d+(?:\.\d+)?)\s*(?:Lakhs?|Lac|L)\b/gi, '$1 ଲକ୍ଷ ଟଙ୍କା');
+  s = s.replace(/₹\s*(\d+(?:\.\d+)?)\s*(?:Crores?|Cr)\b/gi, '$1 କୋଟି ଟଙ୍କା');
+  s = s.replace(/₹\s*(\d+(?:\.\d+)?)/g, '$1 ଟଙ୍କା');
+  s = s.replace(/₹/g, 'ଟଙ୍କା ');
 
-  // 4. Pluses on numbers e.g. 3500+ -> 3500 ରୁ ଅଧିକ
-  s = s.replace(/(\d+)\s*\+/g, '$1 ରୁ ଅଧିକ');
+  // 4. Standalone Lakh & Crore abbreviations (e.g. 20L -> 20 ଲକ୍ଷ, 1.30 Lakh -> 1.30 ଲକ୍ଷ)
+  s = s.replace(/(\d+(?:\.\d+)?)\s*(?:Lakhs?|Lac|L)\b/gi, '$1 ଲକ୍ଷ');
+  s = s.replace(/(\d+(?:\.\d+)?)\s*(?:Crores?|Cr)\b/gi, '$1 କୋଟି');
 
-  // 5. Expand standalone numbers to Odia words
+  // 5. Per year / per month e.g. /yr -> ବାର୍ଷିକ, /mo -> ମାସିକ
+  s = s.replace(/\/yr\b/gi, ' ବାର୍ଷିକ');
+  s = s.replace(/\/mo\b/gi, ' ମାସିକ');
+
+  // 6. Percentages e.g. 100% -> 100 ପ୍ରତିଶତ
+  s = s.replace(/(\d+(?:\.\d+)?)\s*%/g, '$1 ପ୍ରତିଶତ');
+
+  // 7. Pluses on numbers e.g. 3866+ -> 3866 ରୁ ଅଧିକ
+  s = s.replace(/(\d+(?:\.\d+)?)\s*\+/g, '$1 ରୁ ଅଧିକ');
+
+  // 8. Decimal numbers e.g. 1.30 -> ଏକ ଦଶମିକ ତିରିଶ
+  s = s.replace(/(\d+)\.(\d+)/g, (_match, d1, d2) => {
+    const val1 = parseInt(d1, 10);
+    const val2 = parseInt(d2, 10);
+    return `${numToWords(val1)} ଦଶମିକ ${numToWords(val2)}`;
+  });
+
+  // 9. Expand standalone numbers to Odia words
   s = s.replace(/\b\d+\b/g, (match) => {
     const val = parseInt(match, 10);
     if (!isNaN(val) && val <= 9999999) {
@@ -299,13 +321,18 @@ export function transliterateOdiaToRoman(text: string): string {
       out += 'n';
     } else if (code === 0x0b03) { // visarga
       out += 'h';
-    } else if (code === 0x0964 || code === 0x0b64) { // danda
+    } else if (code === 0x0964 || code === 0x0b64) { // Indic danda (।)
+      out += '.';
+    } else if (code === 0x0965) { // Indic double danda (॥)
       out += '.';
     } else {
       out += text[i];
     }
   }
-  return out;
+
+  // Ensure NO lingering Odia Unicode glyphs remain to confuse English TTS voices
+  out = out.replace(/[\u0B00-\u0B7F]/g, '');
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -405,6 +432,10 @@ export function isNativeOdiaVoice(voice: SpeechSynthesisVoice | null | undefined
   if (!voice) return false;
   const vl = (voice.lang || '').toLowerCase().replace('_', '-');
   const vn = (voice.name || '').toLowerCase();
+  // CRITICAL: Reject remote/online natural voices that fail to return audio on Microsoft cloud servers
+  if (vn.includes('online') || voice.localService === false) {
+    return false;
+  }
   return (
     vl === 'or-in' ||
     vl === 'or' ||
@@ -418,8 +449,6 @@ export function isNativeOdiaVoice(voice: SpeechSynthesisVoice | null | undefined
     vn.includes('odia') ||
     vn.includes('oriya') ||
     vn.includes('ଓଡ଼ିଆ') ||
-    vn.includes('subhasini') ||
-    vn.includes('sukant') ||
     vn.includes('sambalpuri') ||
     vn.includes('utkal')
   );
@@ -494,7 +523,16 @@ export function prepareSpeechUtterance(
     // 1. Expand numbers to Odia words first so they are spoken authentically
     const expanded = convertOdiaNumbersToWords(text);
 
-    // 2. Native Odia voice (e.g. Edge Subhasini, Sukant, Android Odia)
+    // 2. Guard: if the chunk contains no Odia Unicode characters at all (pure ASCII/English),
+    //    route it through an English voice to avoid silence or garbling on Odia/Hindi voices.
+    if (!/[\u0B00-\u0B7F]/.test(expanded)) {
+      return {
+        textToPronounce: expanded,
+        speechLang: 'en-IN',
+      };
+    }
+
+    // 3. Native working local Odia voice (e.g. local Android/Windows Odia engine)
     if (isNativeOdiaVoice(matchedVoice)) {
       return {
         textToPronounce: expanded,
@@ -502,7 +540,7 @@ export function prepareSpeechUtterance(
       };
     }
 
-    // 3. Hindi voice (Google हिन्दी, Swara, Kalpana)
+    // 4. Hindi voice (Google हिन्दी, Swara, Kalpana, Hemant, Madhur)
     if (isHindiVoice(matchedVoice)) {
       return {
         textToPronounce: transliterateOdiaToDevanagari(expanded),
@@ -510,7 +548,7 @@ export function prepareSpeechUtterance(
       };
     }
 
-    // 4. Bengali voice (closest Eastern Indic language)
+    // 5. Bengali voice (closest Eastern Indic language)
     if (isBengaliVoice(matchedVoice)) {
       return {
         textToPronounce: transliterateOdiaToBengali(expanded),
@@ -518,12 +556,12 @@ export function prepareSpeechUtterance(
       };
     }
 
-    // 5. English / Latin / Default Voice Fallback (Heera, Ravi, David, Zira)
+    // 6. English / Latin / Default Voice Fallback (Heera, Ravi, David, Zira)
     // CRITICAL: We transliterate to Romanized Odia phonetics.
     // This ensures English TTS engines DO NOT SKIP ODIA WORDS!
     return {
       textToPronounce: transliterateOdiaToRoman(expanded),
-      speechLang: matchedVoice?.lang || 'en-IN',
+      speechLang: 'en-IN',
     };
   }
 
@@ -543,7 +581,7 @@ export function prepareSpeechUtterance(
     }
     return {
       textToPronounce: transliteratePunjabiToRoman(text),
-      speechLang: matchedVoice?.lang || 'en-IN',
+      speechLang: 'en-IN',
     };
   }
 
@@ -564,83 +602,71 @@ export function findBestVoice(voices: SpeechSynthesisVoice[], targetLang: string
   const normLang = targetLang.toLowerCase().replace('_', '-');
   const langPrefix = normLang.split('-')[0];
 
-  // 1. Exact BCP-47 match (e.g. 'hi-in', 'pa-in', 'or-in', 'bn-in')
-  const exact = voices.find((v) => v.lang.toLowerCase().replace('_', '-') === normLang);
-  if (exact) return exact;
-
-  // 2. Specific Odia alias matching (includes Edge Natural voices Subhasini and Sukant)
+  // Specific handling for Odia
   if (langPrefix === 'or') {
-    const nativeOdia = voices.find(isNativeOdiaVoice);
-    if (nativeOdia) return nativeOdia;
+    // 1. True working local native Odia voice (if installed and working locally)
+    const localOdia = voices.find(isNativeOdiaVoice);
+    if (localOdia) return localOdia;
+
+    // 2. Hindi voice (Google हिन्दी, Kalpana, Hemant, Swara, Madhur) - pronounces Devanagari phonetics
+    const hindiVoice = voices.find(isHindiVoice);
+    if (hindiVoice) return hindiVoice;
+
+    // 3. Bengali voice (Google বাংলা, Tanishaa, Bashkar) - sister Eastern Indic language
+    const bengaliVoice = voices.find(isBengaliVoice);
+    if (bengaliVoice) return bengaliVoice;
+
+    // 4. Indian English voice (Heera / Ravi / Neerja / Prabhat) - pronounces clean Romanized Odia phonetics
+    const indianEnVoice = voices.find((v) => {
+      const vl = v.lang.toLowerCase().replace('_', '-');
+      const vn = v.name.toLowerCase();
+      return (
+        vl === 'en-in' ||
+        (vl.startsWith('en') && (vn.includes('india') || vn.includes('heera') || vn.includes('ravi') || vn.includes('neerja') || vn.includes('prabhat')))
+      );
+    });
+    if (indianEnVoice) return indianEnVoice;
+
+    // 5. Any English voice (David, Zira, etc.)
+    const anyEn = voices.find((v) => v.lang.toLowerCase().startsWith('en'));
+    if (anyEn) return anyEn;
+
+    return voices.find((v) => v.default) || voices[0] || null;
   }
 
-  // 3. Specific Punjabi alias matching
+  // Specific handling for Punjabi
   if (langPrefix === 'pa') {
     const nativePunjabi = voices.find(isNativePunjabiVoice);
     if (nativePunjabi) return nativePunjabi;
+
+    const hindiVoice = voices.find(isHindiVoice);
+    if (hindiVoice) return hindiVoice;
+
+    const indianEnVoice = voices.find((v) => {
+      const vl = v.lang.toLowerCase().replace('_', '-');
+      const vn = v.name.toLowerCase();
+      return (
+        vl === 'en-in' ||
+        (vl.startsWith('en') && (vn.includes('india') || vn.includes('heera') || vn.includes('ravi') || vn.includes('neerja') || vn.includes('prabhat')))
+      );
+    });
+    if (indianEnVoice) return indianEnVoice;
+
+    return voices.find((v) => v.default) || voices[0] || null;
   }
 
-  // 4. Prefix match on language code (e.g. 'hi-IN' matches 'hi')
+  // 1. Exact BCP-47 match (e.g. 'hi-in', 'bn-in', 'ta-in')
+  const exact = voices.find((v) => v.lang.toLowerCase().replace('_', '-') === normLang);
+  if (exact) return exact;
+
+  // 2. Prefix match on language code (e.g. 'hi-IN' matches 'hi')
   const prefixMatch = voices.find((v) => {
     const vl = v.lang.toLowerCase().replace('_', '-');
-    if (langPrefix === 'or') {
-      return vl.startsWith('or-') || vl === 'or' || vl.startsWith('ory-') || vl === 'ory' || vl.startsWith('ori');
-    }
-    if (langPrefix === 'pa') {
-      return vl.startsWith('pa-') || vl === 'pa' || vl.startsWith('pan-') || vl === 'pan';
-    }
     return vl.startsWith(langPrefix + '-') || vl === langPrefix;
   });
   if (prefixMatch) return prefixMatch;
 
-  // 5. Safe full-word or alias name matching for regional Indian languages
-  const languageKeywords: Record<string, string[]> = {
-    pa: ['punjabi', 'panjabi', 'ਪੰਜਾਬੀ', 'gurmukhi', 'raavi', 'harpreet', 'ananya', 'gurumukhi'],
-    or: ['odia', 'oriya', 'ଓଡ଼ିଆ', 'subhasini', 'sukant', 'sambalpuri', 'utkal'],
-    hi: ['hindi', 'हिन्दी', 'kalpana', 'hemant', 'swara', 'madhur'],
-    bn: ['bengali', 'bangla', 'বাংলা', 'tanishaa', 'bashkar'],
-    ta: ['tamil', 'தமிழ்', 'valluvar', 'pallavi'],
-    te: ['telugu', 'తెలుగు', 'chitra', 'mohan', 'shruti'],
-    mr: ['marathi', 'मराठी', 'aarohi', 'manohar'],
-    gu: ['gujarati', 'ગુજરાતી', 'dhwani', 'niranjan'],
-    kn: ['kannada', 'ಕನ್ನಡ', 'sapna', 'gagan'],
-    ml: ['malayalam', 'മലയാളം', 'midhun', 'sobhana'],
-    ur: ['urdu', 'اردو', 'salman', 'gul'],
-    en: ['english', 'india', 'heera', 'ravi'],
-  };
-
-  const keywords = languageKeywords[langPrefix];
-  if (keywords) {
-    const nameMatch = voices.find((v) => {
-      const vn = v.name.toLowerCase();
-      return keywords.some((kw) => vn.includes(kw));
-    });
-    if (nameMatch) return nameMatch;
-  }
-
-  // 6. Intelligent Fallback for Odia and Punjabi when no native voice is installed on client OS:
-  if (langPrefix === 'or' || langPrefix === 'pa') {
-    // Priority A: Hindi voice (Google हिन्दी / Swara / Madhur / Kalpana)
-    const hindiVoice = voices.find(isHindiVoice);
-    if (hindiVoice) return hindiVoice;
-
-    // Priority B: Bengali voice (closest Eastern Indic language to Odia)
-    const bengaliVoice = voices.find(isBengaliVoice);
-    if (bengaliVoice) return bengaliVoice;
-
-    // Priority C: Indian English voice (Heera / Ravi / India)
-    const indianEnVoice = voices.find((v) => {
-      const vl = v.lang.toLowerCase().replace('_', '-');
-      const vn = v.name.toLowerCase();
-      return vl === 'en-in' || vn.includes('india') || vn.includes('heera') || vn.includes('ravi');
-    });
-    if (indianEnVoice) return indianEnVoice;
-
-    // Priority D: default system voice
-    return voices.find((v) => v.default) || voices[0] || null;
-  }
-
-  // 7. Generic English fallback for English target
+  // 3. Generic English fallback for English target
   if (langPrefix === 'en') {
     const enVoice = voices.find((v) => v.lang.toLowerCase().startsWith('en'));
     if (enVoice) return enVoice;
@@ -668,6 +694,7 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
   const rateRef = useRef<number>(options.defaultRate || 1.0);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const activeLangCode = selectedLanguage?.speechCode || selectedLanguage?.code || 'en-IN';
   targetLangRef.current = activeLangCode;
@@ -675,8 +702,8 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
 
   // Sync available voices on mount and voice change
   useEffect(() => {
+    setIsSupported(true);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      setIsSupported(true);
       const updateVoices = () => {
         const v = window.speechSynthesis.getVoices();
         if (v && v.length > 0) {
@@ -712,32 +739,44 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
   }, [isPlaying, isPaused]);
 
   const stop = useCallback(() => {
+    isPlayingRef.current = false;
+    isPausedRef.current = false;
+    activeUtteranceRef.current = null;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      isPlayingRef.current = false;
-      isPausedRef.current = false;
-      activeUtteranceRef.current = null;
       try {
         window.speechSynthesis.cancel();
       } catch (e) {
         console.warn('SpeechSynthesis cancel error:', e);
       }
-      setIsPlaying(false);
-      setIsPaused(false);
-      setProgress(0);
-      setCurrentSentence('');
-      chunksRef.current = [];
-      indexRef.current = 0;
-      setCurrentChunkIndex(0);
-      setTotalChunks(0);
     }
+    setIsPlaying(false);
+    setIsPaused(false);
+    setProgress(0);
+    setCurrentSentence('');
+    chunksRef.current = [];
+    indexRef.current = 0;
+    setCurrentChunkIndex(0);
+    setTotalChunks(0);
   }, []);
 
   const pause = useCallback(() => {
+    isPausedRef.current = true;
+    setIsPaused(true);
+
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.pause();
-        isPausedRef.current = true;
-        setIsPaused(true);
       } catch (e) {
         console.warn('SpeechSynthesis pause error:', e);
       }
@@ -745,43 +784,29 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
   }, []);
 
   const resume = useCallback(() => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+
+    if (audioRef.current && audioRef.current.paused) {
+      audioRef.current.play().catch(console.warn);
+    }
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.resume();
-        isPausedRef.current = false;
-        setIsPaused(false);
       } catch (e) {
         console.warn('SpeechSynthesis resume error:', e);
       }
     }
   }, []);
 
-  const speakChunk = useCallback(
-    (index: number) => {
+  const speakBrowserSpeechSynthesis = useCallback(
+    (index: number, isFallbackRetry: boolean) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
       const chunks = chunksRef.current;
+      if (!isPlayingRef.current || index >= chunks.length) return;
 
-      if (!isPlayingRef.current || index >= chunks.length) {
-        isPlayingRef.current = false;
-        isPausedRef.current = false;
-        activeUtteranceRef.current = null;
-        setIsPlaying(false);
-        setIsPaused(false);
-        setProgress(100);
-        setCurrentSentence('');
-        options.onEnd?.();
-        return;
-      }
-
-      indexRef.current = index;
-      setCurrentChunkIndex(index);
       const text = chunks[index];
-      // Display original target script (pure Odia/Punjabi) visually on screen
-      setCurrentSentence(text);
-
-      const calculatedProgress = Math.min(100, Math.round((index / chunks.length) * 100));
-      setProgress(calculatedProgress);
-
       const liveVoices = typeof window !== 'undefined' && 'speechSynthesis' in window
         ? window.speechSynthesis.getVoices()
         : [];
@@ -791,10 +816,39 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
       }
 
       const targetLang = targetLangRef.current;
-      const matched = findBestVoice(voices, targetLang);
-      const { textToPronounce, speechLang } = prepareSpeechUtterance(text, targetLang, matched);
 
-      // Resume speech synthesis if browser engine was paused
+      let matched: SpeechSynthesisVoice | null = null;
+      let textToPronounce = '';
+      let speechLang = 'en-IN';
+
+      if (isFallbackRetry) {
+        matched = voices.find((v) => {
+          const vl = v.lang.toLowerCase().replace('_', '-');
+          const vn = v.name.toLowerCase();
+          return (
+            vl === 'en-in' ||
+            (vl.startsWith('en') && (vn.includes('india') || vn.includes('heera') || vn.includes('ravi') || vn.includes('neerja') || vn.includes('prabhat')))
+          );
+        }) || voices.find((v) => v.lang.toLowerCase().startsWith('en')) || null;
+
+        const langPrefix = targetLang.toLowerCase().split('-')[0];
+        if (langPrefix === 'or') {
+          textToPronounce = transliterateOdiaToRoman(convertOdiaNumbersToWords(text));
+          speechLang = 'en-IN';
+        } else if (langPrefix === 'pa') {
+          textToPronounce = transliteratePunjabiToRoman(text);
+          speechLang = 'en-IN';
+        } else {
+          textToPronounce = text;
+          speechLang = 'en-IN';
+        }
+      } else {
+        matched = findBestVoice(voices, targetLang);
+        const prep = prepareSpeechUtterance(text, targetLang, matched);
+        textToPronounce = prep.textToPronounce;
+        speechLang = prep.speechLang;
+      }
+
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
@@ -807,26 +861,28 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
         utterance.voice = matched;
       }
 
-      // Store in ref to prevent V8 garbage collection mid-speech
       activeUtteranceRef.current = utterance;
 
       utterance.onend = () => {
         activeUtteranceRef.current = null;
         if (isPlayingRef.current && !isPausedRef.current) {
-          // Progress to next chunk seamlessly
-          speakChunk(index + 1);
+          speakChunk(index + 1, false);
         }
       };
 
       utterance.onerror = (err: any) => {
         activeUtteranceRef.current = null;
-        // Ignore intentional cancellations
         if (err?.error === 'canceled' || err?.error === 'interrupted') {
           return;
         }
-        console.warn('SpeechSynthesis chunk error, skipping to next:', err);
+        console.warn('SpeechSynthesis chunk error at index', index, err);
+
         if (isPlayingRef.current) {
-          speakChunk(index + 1);
+          if (!isFallbackRetry) {
+            speakBrowserSpeechSynthesis(index, true);
+            return;
+          }
+          speakChunk(index + 1, false);
         }
       };
 
@@ -834,9 +890,99 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
         window.speechSynthesis.speak(utterance);
       } catch (e) {
         console.warn('speechSynthesis speak error:', e);
+        if (!isFallbackRetry && isPlayingRef.current) {
+          speakBrowserSpeechSynthesis(index, true);
+        }
       }
     },
-    [options]
+    []
+  );
+
+  const speakChunk = useCallback(
+    (index: number, isFallbackRetry: boolean = false) => {
+      const chunks = chunksRef.current;
+
+      if (!isPlayingRef.current || index >= chunks.length) {
+        isPlayingRef.current = false;
+        isPausedRef.current = false;
+        activeUtteranceRef.current = null;
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+        setIsPlaying(false);
+        setIsPaused(false);
+        setProgress(100);
+        setCurrentSentence('');
+        options.onEnd?.();
+        return;
+      }
+
+      indexRef.current = index;
+      setCurrentChunkIndex(index);
+      const text = chunks[index];
+      setCurrentSentence(text);
+
+      const calculatedProgress = Math.min(100, Math.round((index / chunks.length) * 100));
+      setProgress(calculatedProgress);
+
+      const targetLang = targetLangRef.current;
+
+      // Stop any previously playing audio element
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = null;
+      }
+
+      // ── TIER 1: HIGH-FIDELITY NEURAL AUDIO (AUTHENTIC ODIA / INDIC ACCENT) ────
+      if (!isFallbackRetry) {
+        try {
+          const ttsUrl = `${API_BASE_URL}/api/assistant/tts/?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(targetLang)}&rate=${rateRef.current}`;
+          const audio = new Audio(ttsUrl);
+          audioRef.current = audio;
+
+          // Pre-fetch next chunk in background for gapless playback
+          if (index + 1 < chunks.length) {
+            const nextText = chunks[index + 1];
+            const nextUrl = `${API_BASE_URL}/api/assistant/tts/?text=${encodeURIComponent(nextText)}&lang=${encodeURIComponent(targetLang)}&rate=${rateRef.current}`;
+            const prefetch = new Audio();
+            prefetch.src = nextUrl;
+            prefetch.preload = 'auto';
+          }
+
+          audio.onended = () => {
+            audioRef.current = null;
+            if (isPlayingRef.current && !isPausedRef.current) {
+              speakChunk(index + 1, false);
+            }
+          };
+
+          audio.onerror = (err) => {
+            console.warn('Neural audio stream error, falling back to local speech synthesis for chunk', index, err);
+            audioRef.current = null;
+            if (isPlayingRef.current) {
+              speakBrowserSpeechSynthesis(index, false);
+            }
+          };
+
+          audio.play().catch((playErr) => {
+            console.warn('Neural audio playback failed, falling back to speech synthesis:', playErr);
+            audioRef.current = null;
+            if (isPlayingRef.current) {
+              speakBrowserSpeechSynthesis(index, false);
+            }
+          });
+          return;
+        } catch (e) {
+          console.warn('Neural audio init error:', e);
+        }
+      }
+
+      // ── TIER 2: LOCAL BROWSER SPEECH SYNTHESIS FALLBACK ─────────────────────
+      speakBrowserSpeechSynthesis(index, isFallbackRetry);
+    },
+    [options, speakBrowserSpeechSynthesis]
   );
 
   const play = useCallback(

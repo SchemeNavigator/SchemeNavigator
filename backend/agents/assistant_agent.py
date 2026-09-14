@@ -430,8 +430,8 @@ def _handle_casual_question(message: str, language: str = "en-IN") -> dict:
     """Answer casual questions, banter, teasing, math, jokes, and chit-chat naturally with wit and warmth."""
     lower = message.strip().lower()
     norm_lang = (language or "en-IN").lower()
-    is_hindi = norm_lang.startswith("hi") or any(kw in lower for kw in ["kya", "hai", "kaise", "kese", "sunao", "bhai", "batao", "namaste", "haal", "kaun"])
     is_odia = norm_lang.startswith("or")
+    is_punjabi = norm_lang.startswith("pa")
     is_bengali = norm_lang.startswith("bn")
     is_telugu = norm_lang.startswith("te")
     is_marathi = norm_lang.startswith("mr")
@@ -439,8 +439,11 @@ def _handle_casual_question(message: str, language: str = "en-IN") -> dict:
     is_gujarati = norm_lang.startswith("gu")
     is_kannada = norm_lang.startswith("kn")
     is_malayalam = norm_lang.startswith("ml")
-    is_punjabi = norm_lang.startswith("pa")
     is_urdu = norm_lang.startswith("ur")
+    is_regional = any([is_odia, is_punjabi, is_bengali, is_telugu, is_marathi, is_tamil, is_gujarati, is_kannada, is_malayalam, is_urdu])
+    is_hindi = norm_lang.startswith("hi") or (
+        not is_regional and any(kw in lower for kw in ["kya", "hai", "kaise", "kese", "sunao", "bhai", "batao", "namaste", "haal", "kaun"])
+    )
 
     # 1. Teasing / "Are you mad?" / "Pagal ho kya?" / "Are you crazy?" / Insults
     mad_patterns = [
@@ -524,17 +527,17 @@ def _handle_casual_question(message: str, language: str = "en-IN") -> dict:
         r"what is your name",
     ]
     if any(re.search(pat, lower) for pat in who_patterns):
-        if is_hindi:
-            ans = (
-                "मैं **मित्र (Mitra)** हूँ — आपका दोस्ताना और समझदार AI साथी! 😊\n\n"
-                "मुझे **SchemeNavigator** टीम ने तैयार किया है ताकि भारत के हर नागरिक को केंद्र व राज्य सरकारों की 3,800+ कल्याणकारी योजनाओं, छात्रवृत्तियों, आयुष्मान स्वास्थ्य कार्ड, और बिजनेस लोन की सटीक जानकारी सीधी भाषा में मिल सके।\n\n"
-                "और हाँ, सिर्फ योजनाओं की ही नहीं, आप मुझसे किसी भी विषय पर बात कर सकते हैं! बताइए, आज मैं आपके लिए क्या कर सकता हूँ?"
-            )
-        elif is_odia:
+        if is_odia:
             ans = (
                 "ମୁଁ **ମିତ୍ର (Mitra)** — ଆପଣଙ୍କର ବନ୍ଧୁତ୍ୱପୂର୍ଣ୍ଣ ଏବଂ ବୁଦ୍ଧିମାନ AI ସାଥୀ! 😊\n\n"
                 "ଭାରତ ସରକାର ଏବଂ ରାଜ୍ୟ ସରକାରଙ୍କ ୩,୮୦୦+ କଲ୍ୟାଣକାରୀ ଯୋଜନା, ଛାତ୍ରବୃତ୍ତି, ଆୟୁଷ୍ମାନ ସ୍ୱାସ୍ଥ୍ୟ କାର୍ଡ଼ ଏବଂ ବ୍ୟବସାୟ ଋଣ ବିଷୟରେ ସଠିକ୍ ସୂଚନା ଦେବା ପାଇଁ ମୋତେ **SchemeNavigator** ଦଳ ତିଆରି କରିଛନ୍ତି।\n\n"
                 "ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?"
+            )
+        elif is_hindi:
+            ans = (
+                "मैं **मित्र (Mitra)** हूँ — आपका दोस्ताना और समझदार AI साथी! 😊\n\n"
+                "मुझे **SchemeNavigator** टीम ने तैयार किया है ताकि भारत के हर नागरिक को केंद्र व राज्य सरकारों की 3,800+ कल्याणकारी योजनाओं, छात्रवृत्तियों, आयुष्मान स्वास्थ्य कार्ड, और बिजनेस लोन की सटीक जानकारी सीधी भाषा में मिल सके।\n\n"
+                "और हाँ, सिर्फ योजनाओं की ही नहीं, आप मुझसे किसी भी विषय पर बात कर सकते हैं! बताइए, आज मैं आपके लिए क्या कर सकता हूँ?"
             )
         elif is_bengali:
             ans = (
@@ -956,33 +959,37 @@ class AssistantAgent:
         Step-by-step Application (Online & Offline), and Official Helpline.
         """
         norm_lang = (language or "en-IN").lower()
-        is_hindi = norm_lang.startswith("hi") or any(
-            kw in message.lower()
-            for kw in [
-                "kya", "hai", "mujhe", "mera", "meri", "kaise", "batao", "yojana", "chahiye",
-                "kisan", "kheti", "paisa", "pension", "naukri", "shiksha", "padhai", "kitna",
-                "ayushman", "bharat", "patrata"
-            ]
-        )
         is_odia = norm_lang.startswith("or")
+        is_punjabi = norm_lang.startswith("pa")
         is_bengali = norm_lang.startswith("bn")
         is_telugu = norm_lang.startswith("te")
         is_marathi = norm_lang.startswith("mr")
         is_tamil = norm_lang.startswith("ta")
+        is_regional = any([is_odia, is_punjabi, is_bengali, is_telugu, is_marathi, is_tamil])
+        is_hindi = norm_lang.startswith("hi") or (
+            not is_regional and any(
+                kw in message.lower()
+                for kw in [
+                    "kya", "hai", "mujhe", "mera", "meri", "kaise", "batao", "yojana", "chahiye",
+                    "kisan", "kheti", "paisa", "pension", "naukri", "shiksha", "padhai", "kitna",
+                    "ayushman", "bharat", "patrata"
+                ]
+            )
+        )
 
         top_schemes = schemes[:3]
         slugs = ",".join(s.get("slug", "") for s in top_schemes if s.get("slug"))
 
         if not top_schemes:
-            if is_hindi:
-                return (
-                    "मुझे आपकी आवश्यकता से संबंधित विशिष्ट योजना नहीं मिली।\n\n"
-                    "कृपया थोड़ा और विवरण दें (जैसे आपका राज्य, आयु, या किस प्रकार की सहायता चाहिए — छात्रवृत्ति, बिजनेस लोन, या स्वास्थ्य कार्ड) ताकि मैं सटीक योजना ढूँढ सकूँ।"
-                )
-            elif is_odia:
+            if is_odia:
                 return (
                     "ଆପଣଙ୍କ ଅନୁରୋଧ ଅନୁଯାୟୀ କୌଣସି ନିର୍ଦ୍ଦିଷ୍ଟ ଯୋଜନା ମିଳିଲା ନାହିଁ।\n\n"
                     "ଦୟାକରି ଆପଣଙ୍କ ରାଜ୍ୟ, ବୟସ ବା କେଉଁ ପ୍ରକାରର ସହାୟତା ଦରକାର ତାହା ଜଣାନ୍ତୁ।"
+                )
+            elif is_hindi:
+                return (
+                    "मुझे आपकी आवश्यकता से संबंधित विशिष्ट योजना नहीं मिली।\n\n"
+                    "कृपया थोड़ा और विवरण दें (जैसे आपका राज्य, आयु, या किस प्रकार की सहायता चाहिए — छात्रवृत्ति, बिजनेस लोन, या स्वास्थ्य कार्ड) ताकि मैं सटीक योजना ढूँढ सकूँ।"
                 )
             elif is_bengali:
                 return (
@@ -1062,8 +1069,25 @@ class AssistantAgent:
         portal = v_obj.get("officialPortalUrl", "") if isinstance(v_obj, dict) else ""
         dept = v_obj.get("sourceDepartment") or v_obj.get("ministryOrAuthority", "") if isinstance(v_obj, dict) else ""
 
+        # Construct Rich Odia Response
+        if is_odia:
+            out = [f"ନମସ୍କାର! ଏଠାରେ **{p_name}** ବିଷୟରେ ସମ୍ପୂର୍ଣ୍ଣ ସରକାରୀ ବିବରଣୀ ଦିଆଗଲା:\n"]
+            out.append(f"📌 **ଯୋଜନାର ପରିଚୟ (Overview):**\n{p_desc}\n")
+            if benefits_formatted:
+                out.append("💰 **ମୁଖ୍ୟ ଲାଭ (Key Benefits):**\n" + "\n".join(benefits_formatted) + "\n")
+            if elig_formatted:
+                out.append("👥 **ଯୋଗ୍ୟତା ମାନଦଣ୍ଡ (Eligibility):**\n" + "\n".join(elig_formatted) + "\n")
+            if docs_formatted:
+                out.append("📄 **ଆବଶ୍ୟକୀୟ ଦସ୍ତାବିଜ (Documents):**\n" + "\n".join(docs_formatted) + "\n")
+            if steps_formatted:
+                out.append("📝 **ଆବେଦନ କିପରି କରିବେ (Application Guide):**\n" + "\n".join(steps_formatted) + "\n")
+            if portal or helpline:
+                out.append(f"📞 **ହେଲ୍ପଲାଇନ ଓ ପୋର୍ଟାଲ:**\n- 🌐 ପୋର୍ଟାଲ: {portal}\n- 📞 ହେଲ୍ପଲାଇନ: {helpline}\n")
+            out.append(f"\n<schemes>{slugs}</schemes>")
+            return "\n".join(out)
+
         # Construct Rich Hindi Response
-        if is_hindi:
+        elif is_hindi:
             out = [f"नमस्ते! यहाँ **{p_name}** की संपूर्ण और आधिकारिक जानकारी विस्तार से दी गई है:\n"]
             out.append(f"📌 **योजना का परिचय (Overview):**\n{p_desc}\n")
 
@@ -1111,22 +1135,6 @@ class AssistantAgent:
                 out.append("🔗 **संबंधित अन्य महत्वपूर्ण योजनाएं:**\n" + "\n".join(rel_lines) + "\n")
 
             out.append("💡 *यदि आपको आवेदन प्रक्रिया में कोई समस्या आए या अपनी पात्रता जांचनी हो, तो मुझे बताएं!*")
-            out.append(f"\n<schemes>{slugs}</schemes>")
-            return "\n".join(out)
-
-        elif is_odia:
-            out = [f"ନମସ୍କାର! ଏଠାରେ **{p_name}** ବିଷୟରେ ସମ୍ପୂର୍ଣ୍ଣ ସରକାରୀ ବିବରଣୀ ଦିଆଗଲା:\n"]
-            out.append(f"📌 **ଯୋଜନାର ପରିଚୟ (Overview):**\n{p_desc}\n")
-            if benefits_formatted:
-                out.append("💰 **ମୁଖ୍ୟ ଲାଭ (Key Benefits):**\n" + "\n".join(benefits_formatted) + "\n")
-            if elig_formatted:
-                out.append("👥 **ଯୋଗ୍ୟତା ମାନଦଣ୍ଡ (Eligibility):**\n" + "\n".join(elig_formatted) + "\n")
-            if docs_formatted:
-                out.append("📄 **ଆବଶ୍ୟକୀୟ ଦସ୍ତାବିଜ (Documents):**\n" + "\n".join(docs_formatted) + "\n")
-            if steps_formatted:
-                out.append("📝 **ଆବେଦନ କିପରି କରିବେ (Application Guide):**\n" + "\n".join(steps_formatted) + "\n")
-            if portal or helpline:
-                out.append(f"📞 **ହେଲ୍ପଲାଇନ ଓ ପୋର୍ଟାଲ:**\n- 🌐 ପୋର୍ଟାଲ: {portal}\n- 📞 ହେଲ୍ପଲାଇନ: {helpline}\n")
             out.append(f"\n<schemes>{slugs}</schemes>")
             return "\n".join(out)
 
