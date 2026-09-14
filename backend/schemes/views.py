@@ -50,11 +50,18 @@ class SchemeListView(APIView):
             qs = qs.filter(category__iexact=params["category"])
 
         if params["state"] and params["state"] != "All India":
-            # Filter schemes where covered_states includes the state or 'All India'
-            qs = qs.filter(
-                Q(covered_states__icontains=params["state"])
+            import re
+            raw_state = params["state"]
+            clean_state = re.sub(r'\(.*?\)', '', raw_state).strip()
+            state_query = (
+                Q(covered_states__icontains=raw_state)
+                | Q(covered_states__icontains=clean_state)
                 | Q(covered_states__icontains="All India")
             )
+            if "&" in raw_state or "and" in raw_state.lower():
+                state_query |= Q(covered_states__icontains=clean_state.replace('&', 'and'))
+                state_query |= Q(covered_states__icontains=clean_state.replace('and', '&'))
+            qs = qs.filter(state_query)
 
         if params["search"]:
             q = params["search"]

@@ -8,8 +8,10 @@ import { PopularSchemesSection } from '../components/home/PopularSchemesSection'
 import { FAQSection } from '../components/home/FAQSection';
 import { Link } from 'react-router-dom';
 import { Compass, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from '../hooks/useTranslation';
 
 export const HomePage: React.FC = () => {
+  const { t } = useTranslation();
 
   return (
 
@@ -43,15 +45,18 @@ export const HomePage: React.FC = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-7 relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-900/90 border border-teal-500/40 text-emerald-300 text-xs font-bold shadow-xs">
             <Compass className="w-4 h-4 text-emerald-400" />
-            <span>Start Your 2-Minute Eligibility Check</span>
+            <span>{t('cta.badge')}</span>
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white tracking-tight leading-[1.12]">
-            Ready to Discover Government Support <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300">Tailored for You?</span>
+            {t('cta.title')}{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300">
+              {t('cta.titleHighlight')}
+            </span>
           </h2>
 
           <p className="text-base sm:text-lg text-teal-100/90 max-w-2xl mx-auto leading-relaxed font-normal">
-            Answer a few simple questions. Our matching compass will guide you through verified eligibility conditions, benefits, and direct application links.
+            {t('cta.subtitle')}
           </p>
 
           <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -60,7 +65,7 @@ export const HomePage: React.FC = () => {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-9 py-4.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-950/60 hover:shadow-2xl transition-all duration-300 active:scale-[0.98] group cursor-pointer"
             >
               <Compass className="w-5 h-5 group-hover:rotate-45 transition-transform" />
-              <span>Check My Eligibility Now</span>
+              <span>{t('cta.checkEligibility')}</span>
               <ArrowRight className="w-4 h-4 text-slate-950 group-hover:translate-x-1 transition-transform" />
             </Link>
 
@@ -68,24 +73,24 @@ export const HomePage: React.FC = () => {
               to="/explore"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4.5 bg-teal-900/60 hover:bg-teal-900/90 text-white font-bold text-base rounded-2xl border border-teal-600/50 backdrop-blur-md transition-all shadow-md"
             >
-              <span>Explore 3,866 Schemes</span>
+              <span>{t('cta.exploreSchemes')}</span>
             </Link>
           </div>
 
           <div className="pt-4 flex flex-wrap items-center justify-center gap-5 text-xs text-teal-200/80 font-semibold">
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              100% Free Service
+              {t('cta.free')}
             </span>
             <span className="hidden sm:inline text-teal-700">•</span>
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              No Login or Aadhaar Required
+              {t('cta.noLogin')}
             </span>
             <span className="hidden sm:inline text-teal-700">•</span>
             <span className="flex items-center gap-1.5">
               <Compass className="w-4 h-4 text-emerald-400" />
-              Direct Official Government Portals
+              {t('cta.officialPortals')}
             </span>
           </div>
         </div>

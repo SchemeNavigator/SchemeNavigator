@@ -46,7 +46,7 @@ export const PopularSchemesSection: React.FC = () => {
           <div className="space-y-2.5">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-100/80 dark:bg-teal-950/60 text-teal-950 dark:text-teal-300 text-xs font-bold border border-teal-300 dark:border-teal-800 shadow-2xs">
               <Sparkles className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
-              <span>High-Impact Programs</span>
+              <span>{t('popular.highImpact')}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-950 dark:text-white tracking-tight">
               {t('popular.title')}
@@ -126,7 +126,7 @@ export const PopularSchemesSection: React.FC = () => {
                     {mainBenefit && (
                       <div className="mt-4 p-3 rounded-2xl bg-teal-50/80 dark:bg-teal-950/40 border border-teal-200/70 dark:border-teal-800/60">
                         <span className="text-[10px] font-extrabold text-teal-900 dark:text-teal-300 uppercase tracking-wider block">
-                          Key Benefit:
+                          {t('popular.keyBenefit')}
                         </span>
                         <div className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm mt-0.5">
                           {mainBenefit.amountOrValue || mainBenefit.title}
@@ -142,14 +142,14 @@ export const PopularSchemesSection: React.FC = () => {
                   <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200/60 dark:border-emerald-800/60">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>Verified Portal</span>
+                      <span>{t('popular.verifiedPortal')}</span>
                     </div>
 
                     <Link
                       to={`/schemes/${scheme.slug}`}
                       className="inline-flex items-center gap-1.5 font-extrabold text-teal-800 dark:text-teal-400 hover:text-teal-950 dark:hover:text-teal-300 group-hover:translate-x-1 transition-all"
                     >
-                      <span>View Details</span>
+                      <span>{t('explore.viewDetails')}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>

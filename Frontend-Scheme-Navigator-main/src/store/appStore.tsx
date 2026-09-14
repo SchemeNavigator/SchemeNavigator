@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, SchemeMatchResult, Scheme, TrackerItem } from '../types';
 import { api } from '../services/api';
-import { getSavedProfile, saveUserProfile, getSavedSchemeIds, getSavedSchemes, toggleSaveScheme, getTrackerItems } from '../services/storageService';
+import { getSavedProfile, saveUserProfile, getSavedSchemeIds, getSavedSchemes, toggleSaveScheme, getTrackerItems, getCachedRecommendations, saveCachedRecommendations } from '../services/storageService';
 import { TOP_INDIAN_LANGUAGES, LanguageInfo, getLanguageByCode } from '../constants/languages';
 
 export interface ProfileStatus {
@@ -25,6 +25,7 @@ export interface AppState {
   selectedLanguage: LanguageInfo;
   isTourActive: boolean;
   theme: 'light' | 'dark';
+  isVoiceReaderOpen: boolean;
   loading: boolean;
   error: string | null;
 
@@ -39,6 +40,9 @@ export interface AppState {
   setSelectedLanguage: (lang: LanguageInfo | string) => void;
   toggleTheme: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
+  openVoiceReader: () => void;
+  closeVoiceReader: () => void;
+  toggleVoiceReader: () => void;
   handleCheckEligibility: (navigate: (path: string) => void) => void;
   startTour: () => void;
   stopTour: () => void;
@@ -58,7 +62,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [surveyDraft, setSurveyDraft] = useState<any>(null);
   const [surveyProgress, setSurveyProgress] = useState<number>(1);
-  const [recommendations, setRecommendations] = useState<SchemeMatchResult[]>([]);
+  const [recommendations, setRecommendations] = useState<SchemeMatchResult[]>(() => getCachedRecommendations());
   const [selectedScheme, setSelectedScheme] = useState<Scheme | null>(null);
   const [savedSchemeIds, setSavedSchemeIds] = useState<string[]>(() => getSavedSchemeIds());
   const [savedSchemes, setSavedSchemes] = useState<Scheme[]>(() => getSavedSchemes());
@@ -87,7 +91,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Theme state: default to 'dark' as requested by user, or stored preference
+  // Theme state: default to 'light' for new users, or stored preference
   const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
     try {
       const saved = localStorage.getItem('scheme_navigator_theme');
@@ -95,8 +99,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       // ignore
     }
-    return 'dark';
+    return 'light';
   });
+
+  const [isVoiceReaderOpen, setIsVoiceReaderOpen] = useState<boolean>(false);
 
   // Apply dark class to <html> element whenever theme changes
   useEffect(() => {
@@ -126,6 +132,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const stopTour = useCallback(() => {
     setIsTourActive(false);
+  }, []);
+
+  const openVoiceReader = useCallback(() => {
+    setIsVoiceReaderOpen(true);
+  }, []);
+
+  const closeVoiceReader = useCallback(() => {
+    setIsVoiceReaderOpen(false);
+  }, []);
+
+  const toggleVoiceReader = useCallback(() => {
+    setIsVoiceReaderOpen((prev) => !prev);
   }, []);
 
   const setSelectedLanguage = (lang: LanguageInfo | string) => {
@@ -171,8 +189,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         completionPercentage: 100,
       });
       setSurveyDraft(null);
-      setRecommendations(result.recommendations || []);
-      return result.recommendations || [];
+      const recs = result.recommendations || [];
+      setRecommendations(recs);
+      saveCachedRecommendations(recs);
+      return recs;
     } catch (err: any) {
       setError(err?.message || "We couldn't process your profile right now. Please try again.");
       // Even if offline/network error, persist the filled profile locally!
@@ -239,6 +259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedLanguage,
         isTourActive,
         theme,
+        isVoiceReaderOpen,
         loading,
         error,
         setProfile,
@@ -251,6 +272,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedLanguage,
         toggleTheme,
         setTheme,
+        openVoiceReader,
+        closeVoiceReader,
+        toggleVoiceReader,
         handleCheckEligibility,
         startTour,
         stopTour,

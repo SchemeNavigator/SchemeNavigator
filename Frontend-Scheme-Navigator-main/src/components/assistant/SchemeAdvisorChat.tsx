@@ -7,6 +7,7 @@ import { StatusPill } from '../common/StatusPill';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useAppStore } from '../../store/appStore';
 import { useVoiceRecognition } from '../../hooks/useVoiceRecognition';
+import { findBestVoice, transliterateIndicToDevanagari, prepareSpeechUtterance } from '../../hooks/useVoiceReader';
 import { translateSchemeContent } from '../../utils/schemeTranslator';
 import {
   Sparkles,
@@ -38,6 +39,71 @@ interface ChatMessage {
   timestamp: string;
 }
 
+const INITIAL_GREETINGS: Record<string, string> = {
+  'en-IN':
+    'Hello! 👋 I am **Mitra** — your personal AI Welfare & Scheme Advisor.\n\nTell me about yourself — like your **Age**, **State**, **Occupation**, or what support you need (Scholarships, Farming subsidies, Mudra loans, Healthcare, Housing), and I will find verified government welfare schemes for you.',
+  'hi-IN':
+    'नमस्ते! 🙏 मैं आपका **मित्र** — सरकारी योजना सलाहकार हूँ।\n\nमुझे अपने बारे में बताएं — जैसे आपकी **आयु**, **राज्य**, **व्यवसाय**, या आप किस प्रकार की योजना ढूंढ रहे हैं (छात्रवृत्ति, किसान सहायता, बिजनेस लोन, स्वास्थ्य कार्ड, आवास), और मैं आपके लिए सत्यापित सरकारी योजनाओं में से सटीक जानकारी दूंगा।',
+  'or-IN':
+    'ନମସ୍କାର! 🙏 ମୁଁ ଆପଣଙ୍କର **ମିତ୍ର** — ସରକାରୀ ଯୋଜନା ପରାମର୍ଶଦାତା।\n\nମୋତେ ଆପଣଙ୍କ ବିଷୟରେ କୁହନ୍ତୁ — ଯେପରିକି ଆପଣଙ୍କର **ବୟସ**, **ରାଜ୍ୟ**, **ବୃତ୍ତି**, କିମ୍ବା ଆପଣ କେଉଁ ପ୍ରକାରର ଯୋଜନା ଖୋଜୁଛନ୍ତି (ଛାତ୍ରବୃତ୍ତି, କୃଷକ ସହାୟତା, ବ୍ୟବସାୟ ଋଣ, ସ୍ୱାସ୍ଥ୍ୟ କାର୍ଡ଼, ବାର୍ଦ୍ଧକ୍ୟ ପେନସନ), ଏବଂ ମୁଁ ସଠିକ୍ ସୂଚନା ଦେବି।',
+  'bn-IN':
+    'নমস্কার! 🙏 আমি আপনার **মিত্র** — সরকারি প্রকল্প উপদেষ্টা।\n\nআমাকে আপনার সম্পর্কে বলুন — যেমন আপনার **বয়স**, **রাজ্য**, **পেশা**, বা আপনার কী ধরনের সাহায্য প্রয়োজন (বৃত্তি, কৃষক অনুদান, ব্যবসা ঋণ, স্বাস্থ্য কার্ড, পেনশন), এবং আমি আপনার জন্য সঠিক সরকারি প্রকল্পের তথ্য দেব।',
+  'te-IN':
+    'నమస్కారం! 🙏 నేను మీ **మిత్ర** — ప్రభుత్వ పథకాల సలహాదారుని.\n\nమీ గురించి నాకు చెప్పండి — మీ **వయస్సు**, **రాష్ట్రం**, **వృత్తి**, లేదా మీకు ఎలాంటి సహాయం కావాలి (స్కాలర్‌షిప్‌లు, రైతు సబ్సిడీలు, వ్యాపార రుణాలు, ఆరోగ్య కార్డు, పెన్షన్), నేను మీకు సరైన ప్రభుత్వ పథకాలను తెలియజేస్తాను.',
+  'mr-IN':
+    'नमस्कार! 🙏 मी आपला **मित्र** — शासकीय योजना सल्लागार आहे.\n\nमला आपल्याबद्दल सांगा — जसे आपले **वय**, **राज्य**, **व्यवसाय**, किंवा आपल्याला कोणत्या मदतीची गरज आहे (शिष्यवृत्ती, शेतकरी अनुदान, व्यवसाय कर्ज, आरोग्य कार्ड, पेन्शन), आणि मी आपल्यासाठी योग्य योजनांची माहिती देईन.',
+  'ta-IN':
+    'வணக்கம்! 🙏 நான் உங்கள் **மித்ரா** — அரசு நலத்திட்ட ஆலோசகர்.\n\nஉங்களைப் பற்றி என்னிடம் கூறுங்கள் — உங்கள் **வயது**, **மாநிலம்**, **தொழில்**, அல்லது உங்களுக்கு என்ன உதவி தேவை (கல்வி உதவித்தொகை, விவசாய மானியம், வணிகக் கடன், மருத்துவ அட்டை, ஓய்வூதியம்), நான் தகுதியான அரசு திட்டங்களை உங்களுக்கு வழிகாட்டுவேன்.',
+  'gu-IN':
+    'નમસ્તે! 🙏 હું તમારો **મિત્ર** — સરકારી યોજના સલાહકાર છું.\n\nમને તમારા વિશે જણાવો — જેમ કે તમારી **ઉંમર**, **રાજ્ય**, **વ્યવસાય**, અથવા તમને કેવા પ્રકારની સહાયની જરૂર છે (શિષ્યવૃત્તિ, ખેડૂત સહાય, બિઝનેસ લોન, આરોગ્ય કાર્ડ, પેન્શન), અને હું તમને યોગ્ય સરકારી યોજનાઓની માહિતી આપીશ.',
+  'kn-IN':
+    'ನಮಸ್ಕಾರ! 🙏 ನಾನು ನಿಮ್ಮ **ಮಿತ್ರ** — ಸರ್ಕಾರಿ ಯೋಜನೆಗಳ ಸಲಹೆಗಾರ.\n\nನಿಮ್ಮ ಬಗ್ಗೆ ನನಗೆ ತಿಳಿಸಿ — ನಿಮ್ಮ **ವಯಸ್ಸು**, **ರಾಜ್ಯ**, **ಉದ್ಯೋಗ**, ಅಥವಾ ನಿಮಗೆ ಯಾವ ರೀತಿಯ ನೆರವು ಬೇಕು (ವಿದ್ಯಾರ್ಥಿವೇತನ, ರೈತ ಸಬ್ಸಿಡಿ, ವ್ಯಾಪಾರ ಸಾಲ, ಆರೋಗ್ಯ ಕಾರ್ಡ್, ಪಿಂಚಣಿ), ನಾನು ನಿಖರವಾದ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳನ್ನು ಸೂಚಿಸುತ್ತೇನೆ.',
+  'ml-IN':
+    'നമസ്കാരം! 🙏 ഞാൻ നിങ്ങളുടെ **മിത്ര** — സർക്കാർ ക്ഷേമപദ്ധതി ഉപദേശകൻ.\n\nനിങ്ങളെക്കുറിച്ച് എന്നോട് പറയൂ — നിങ്ങളുടെ **പ്രായം**, **സംസ്ഥാനം**, **തൊഴിൽ**, അല്ലെങ്കിൽ നിങ്ങൾക്ക് എന്ത് സഹായമാണ് വേണ്ടത് (സ്കോളർഷിപ്പ്, കർഷക ആനുകൂല്യങ്ങൾ, ബിസിനസ്സ് ലോൺ, ആരോഗ്യ കാർഡ്, പെൻഷൻ), ഞാൻ അനുയോജ്യമായ സർക്കാർ പദ്ധതികൾ നിർദ്ദേശിക്കാം.',
+  'pa-IN':
+    'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! 🙏 ਮੈਂ ਤੁਹਾਡਾ **ਮਿੱਤਰ** — ਸਰਕਾਰੀ ਸਕੀਮ ਸਲਾਹਕਾਰ ਹਾਂ।\n\nਮੈਨੂੰ ਆਪਣੇ ਬਾਰੇ ਦੱਸੋ — ਜਿਵੇਂ ਤੁਹਾਡੀ **ਉਮਰ**, **ਰਾਜ**, **ਕਿੱਤਾ**, ਜਾਂ ਤੁਹਾਨੂੰ ਕਿਸ ਤਰ੍ਹਾਂ ਦੀ ਮਦਦ ਚਾਹੀਦੀ ਹੈ (ਸਕਾਲਰਸ਼ਿਪ, ਕਿਸਾਨ ਸਬਸਿਡੀ, ਕਾਰੋਬਾਰੀ ਕਰਜ਼ਾ, ਸਿਹਤ ਕਾਰਡ, ਪੈਨਸ਼ਨ), ਅਤੇ ਮੈਂ ਤੁਹਾਨੂੰ ਸਹੀ ਸਰਕਾਰੀ ਸਕੀਮਾਂ ਦੀ ਜਾਣਕਾਰੀ ਦੇਵਾਂਗਾ।',
+  'ur-IN':
+    'آداب! 🙏 میں آپ کا **متر** — سرکاری اسکیم مشیر ہوں۔\n\nمجھے اپنے بارے میں بتائیں — جیسے آپ کی **عمر**، **ریاست**، **پیشہ**، یا آپ کو کس قسم کی مدد درکار ہے (اسکالرشپ، کسان سبسڈی، کاروباری قرض، ہیلتھ کارڈ، پنشن)، اور میں آپ کے لیے درست سرکاری اسکیموں کی رہنمائی کروں گا۔',
+};
+
+const RESET_MESSAGES: Record<string, string> = {
+  'en-IN': 'Hello! Chat has been reset. How can Mitra AI help you discover welfare schemes today?',
+  'hi-IN': 'नमस्ते! बातचीत रीसेट कर दी गई है। आज मैं आपकी कौन सी सरकारी योजना खोजने में मदद कर सकता हूँ?',
+  'or-IN': 'ନମସ୍କାର! ବାର୍ତ୍ତାଳାପ ପୁନଃସ୍ଥାପିତ ହୋଇଛି। ଆଜି ମିତ୍ର ଆପଣଙ୍କୁ କେଉଁ ସରକାରୀ ଯୋଜନା ଖୋଜିବାରେ ସାହାଯ୍ୟ କରିପାରିବ?',
+  'bn-IN': 'নমস্কার! কথোপকথন রিসেট করা হয়েছে। আজ মিত্র আপনাকে কোন সরকারি প্রকল্প খুঁজতে সাহায্য করতে পারে?',
+  'te-IN': 'నమస్కారం! సంభాషణ రీసెట్ చేయబడింది. ఈ రోజు మిత్ర మీకు ఏ ప్రభుత్వ పథకం కనుగొనడంలో సహాయపడగలదు?',
+  'mr-IN': 'नमस्कार! संभाषण रीसेट केले गेले आहे. आज मित्र आपल्याला कोणती शासकीय योजना शोधण्यात मदत करू शकतो?',
+  'ta-IN': 'வணக்கம்! உரையாடல் மீட்டமைக்கப்பட்டது. இன்று மித்ரா உங்களுக்கு எந்த அரசுத் திட்டத்தைக் கண்டறிய உதவ முடியும்?',
+  'gu-IN': 'નમસ્તે! વાતચીત રીસેટ કરવામાં આવી છે. આજે મિત્ર તમને કઈ સરકારી યોજના શોધવામાં મદદ કરી શકે?',
+  'kn-IN': 'ನಮಸ್ಕಾರ! ಸಂಭಾಷಣೆಯನ್ನು ಮರುಹೊಂದಿಸಲಾಗಿದೆ. ಇಂದು ಮಿತ್ರ ನಿಮಗೆ ಯಾವ ಸರ್ಕಾರಿ ಯೋಜನೆಯನ್ನು ಹುಡುಕಲು ಸಹಾಯ ಮಾಡಬಹುದು?',
+  'ml-IN': 'നമസ്കാരം! സംഭാഷണം പുനഃസജ്ജമാക്കി. ഇന്ന് മിത്രയ്ക്ക് ഏത് സർക്കാർ പദ്ധതി കണ്ടെത്താൻ നിങ്ങളെ സഹായിക്കാനാകും?',
+  'pa-IN': 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਗੱਲਬਾਤ ਰੀਸੈੱਟ ਕਰ ਦਿੱਤੀ ਗਈ ਹੈ। ਅੱਜ ਮਿੱਤਰ ਤੁਹਾਨੂੰ ਕਿਹੜੀ ਸਰਕਾਰੀ ਸਕੀਮ ਲੱਭਣ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕਦਾ ਹੈ?',
+  'ur-IN': 'آداب! بات چیت دوبارہ ترتیب دی گئی ہے۔ آج متر آپ کو کون سی سرکاری اسکیم تلاش کرنے میں مدد کر سکتا ہے؟',
+};
+
+const FALLBACK_MESSAGES: Record<string, string> = {
+  'en-IN': 'I am analyzing your request. You can also explore verified schemes directly in the directory or complete the eligibility survey.',
+  'hi-IN': 'मैं आपके अनुरोध का विश्लेषण कर रहा हूँ। आप सीधे योजनाओं की सूची भी देख सकते हैं या पात्रता फॉर्म भर सकते हैं।',
+  'or-IN': 'ମୁଁ ଆପଣଙ୍କ ଅନୁରୋଧର ବିଶ୍ଳେଷଣ କରୁଛି। ଆପଣ ସିଧାସଳଖ ଯୋଜନା ତାଲିକା ମଧ୍ୟ ଦେଖିପାରିବେ କିମ୍ବା ଯୋଗ୍ୟତା ଯାଞ୍ଚ କରିପାରିବେ।',
+  'bn-IN': 'আমি আপনার অনুরোধ বিশ্লেষণ করছি। আপনি সরাসরি প্রকল্পের তালিকাও দেখতে পারেন বা যোগ্যতা সমীক্ষা সম্পন্ন করতে পারেন।',
+  'te-IN': 'నేను మీ అభ్యర్థనను విశ్లేషిస్తున్నాను. మీరు నేరుగా పథకాల జాబితాను కూడా చూడవచ్చు లేదా అర్హత సర్వేను పూర్తి చేయవచ్చు.',
+  'mr-IN': 'मी आपल्या विनंतीचे विश्लेषण करत आहे. आपण थेट योजनांची यादी देखील पाहू शकता किंवा पात्रता सर्वेक्षण पूर्ण करू शकता.',
+  'ta-IN': 'நான் உங்கள் கோரிக்கையை பகுப்பாய்வு செய்கிறேன். நீங்கள் நேரடியாக திட்டங்களின் பட்டியலையும் பார்க்கலாம் அல்லது தகுதி ஆய்வை முடிக்கலாம்.',
+  'gu-IN': 'હું તમારી વિનંતીનું વિશ્લેષણ કરી રહ્યો છું. તમે સીધી યોજનાઓની સૂચિ પણ જોઈ શકો છો અથવા પાત્રતા સર્વેક્ષણ પૂર્ણ કરી શકો છો.',
+  'kn-IN': 'ನಾನು ನಿಮ್ಮ ವಿನಂತಿಯನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದ್ದೇನೆ. ನೀವು ನೇರವಾಗಿ ಯೋಜನೆಗಳ ಪಟ್ಟಿಯನ್ನು ಸಹ ವೀಕ್ಷಿಸಬಹುದು ಅಥವಾ ಅರ್ಹತಾ ಸಮೀಕ್ಷೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಬಹುದು.',
+  'ml-IN': 'ഞാൻ നിങ്ങളുടെ അഭ്യർത്ഥന വിശകലനം ചെയ്യുകയാണ്. നിങ്ങൾക്ക് നേരിട്ട് പദ്ധതികളുടെ പട്ടിക കാണുകയോ യോഗ്യതാ സർവേ പൂർത്തിയാക്കുകയോ ചെയ്യാം.',
+  'pa-IN': 'ਮੈਂ ਤੁਹਾਡੀ ਬੇਨਤੀ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰ ਰਿਹਾ ਹਾਂ। ਤੁਸੀਂ ਸਿੱਧਾ ਸਕੀਮਾਂ ਦੀ ਸੂਚੀ ਵੀ ਵੇਖ ਸਕਦੇ ਹੋ ਜਾਂ ਯੋਗਤਾ ਸਰਵੇਖਣ ਪੂਰਾ ਕਰ ਸਕਦੇ ਹੋ।',
+  'ur-IN': 'میں آپ کی درخواست کا تجزیہ کر رہا ہوں۔ آپ براہ راست اسکیموں کی فہرست بھی دیکھ سکتے ہیں یا اہلیت کا سروے مکمل کر سکتے ہیں۔',
+};
+
+const getLocalizedText = (dict: Record<string, string>, lang: string): string => {
+  if (!lang) return dict['en-IN'];
+  if (dict[lang]) return dict[lang];
+  const prefix = lang.split('-')[0].toLowerCase();
+  const foundKey = Object.keys(dict).find((k) => k.toLowerCase().startsWith(prefix));
+  return (foundKey && dict[foundKey]) || dict['en-IN'];
+};
+
 const getChatPromptsByLang = (langCode: string) => {
   if (langCode.startsWith('or')) {
     return [
@@ -62,11 +128,41 @@ const getChatPromptsByLang = (langCode: string) => {
   if (langCode.startsWith('bn')) {
     return [
       { label: '🌾 কৃষক ও কৃষি প্রকল্প', query: 'কৃষকদের জন্য সরকারি অনুদান ও প্রকল্পের তথ্য দিন' },
-      { label: '🎓 স্কলারশিপ ও শিক্ষা সাহায্য', query: 'ছাত্রছাত্রীদের জন্য কোন কোন सरकारी স্কলারশিপ রয়েছে?' },
-      { label: '💼 মুদ্রা ও ব্যবসা ঋণ', query: 'নতুন ব্যবসা শুরুর জন্য স্বল্প সুদের सरकारी ঋণ প্রকল্প' },
+      { label: '🎓 স্কলারশিপ ও শিক্ষা সাহায্য', query: 'ছাত্রছাত্রীদের জন্য কোন কোন সরকারি স্কলারশিপ রয়েছে?' },
+      { label: '💼 মুদ্রা ও ব্যবসা ঋণ', query: 'নতুন ব্যবসা শুরুর জন্য স্বল্প সুদের সরকারি ঋণ প্রকল্প' },
       { label: '🏥 স্বাস্থ্যসাথী ও আয়ুষ্মান ভারত', query: 'আয়ুষ্মান ভারত কার্ড ও বিনামূল্যে চিকিৎসার যোগ্যতা' },
-      { label: '👩 নারী ও শিশু কল্যাণ', query: 'মহিলা ও কন্যাদের জন্য सरकारी সঞ্চয় ও সাহায্য প্রকল্প' },
+      { label: '👩 নারী ও শিশু কল্যাণ', query: 'মহিলা ও কন্যাদের জন্য সরকারি সঞ্চয় ও সাহায্য প্রকল্প' },
       { label: '👵 বার্ধক্য পেনশন প্রকল্প', query: 'প্রবীণ নাগরিকদের জন্য বার্ধক্য পেনশন প্রকল্পের যোগ্যতা' },
+    ];
+  }
+  if (langCode.startsWith('te')) {
+    return [
+      { label: '🌾 రైతు & వ్యవసాయ పథకాలు', query: 'రైతుల కోసం ప్రభుత్వ రాయితీలు మరియు పీఎం కిసాన్ వివరాలు చెప్పండి' },
+      { label: '🎓 స్కాలర్‌షిప్‌లు & విద్యా సహాయం', query: 'కళాశాల విద్యార్థుల కోసం ఏ ప్రభుత్వ స్కాలర్‌షిప్‌లు అందుబాటులో ఉన్నాయి?' },
+      { label: '💼 ముద్రా & వ్యాపార రుణాలు', query: 'కొత్త వ్యాపారం లేదా దుకాణం కోసం తక్కువ వడ్డీ ప్రభుత్వ రుణాలు ఏమిటి?' },
+      { label: '🏥 ఆయుష్మాన్ భారత్ హెల్త్ కార్డు', query: 'ఆయుష్మాన్ భారత్ కార్డు అర్హత మరియు ఉచిత చికిత్స వివరాలు ఏమిటి?' },
+      { label: '👩 మహిళా & శిశు సంక్షేమం', query: 'మహిళలు మరియు కుమార్తెల కోసం ప్రభుత్వ పొదుపు మరియు సంక్షేమ పథకాలు' },
+      { label: '👵 వృద్ధాప్య పెన్షన్ పథకాలు', query: 'వృద్ధాప్య మరియు సీనియర్ సిటిజన్ పెన్షన్ పథకం అర్హతలు' },
+    ];
+  }
+  if (langCode.startsWith('mr')) {
+    return [
+      { label: '🌾 शेतकरी व कृषी योजना', query: 'शेतकऱ्यांसाठी सरकारी अनुदान आणि पीएम किसान योजनेची माहिती द्या' },
+      { label: '🎓 शिष्यवृत्ती व शिक्षण सहाय्य', query: 'महाविद्यालयीन विद्यार्थ्यांसाठी कोणत्या सरकारी शिष्यवृत्ती उपलब्ध आहेत?' },
+      { label: '💼 मुद्रा व व्यवसाय कर्ज', query: 'नवीन व्यवसाय किंवा दुकानासाठी कमी व्याजाची सरकारी कर्ज योजना' },
+      { label: '🏥 आयुष्मान भारत आरोग्य कार्ड', query: 'आयुष्मान भारत कार्ड आणि ५ लाख मोफत उपचारांची पात्रता काय आहे?' },
+      { label: '👩 महिला व बाल कल्याण', query: 'महिला आणि मुलींसाठी शासकीय बचत व कल्याणकारी योजना' },
+      { label: '👵 ज्येष्ठ नागरिक पेन्शन', query: 'वृद्धापकाळ आणि ज्येष्ठ नागरिक पेन्शन योजनेची पात्रता' },
+    ];
+  }
+  if (langCode.startsWith('ta')) {
+    return [
+      { label: '🌾 விவசாயம் & வேளாண் திட்டங்கள்', query: 'விவசாயிகளுக்கான அரசு மானியங்கள் மற்றும் பிஎம் கிசான் பற்றி சொல்லுங்கள்' },
+      { label: '🎓 கல்வி உதவித்தொகை', query: 'கல்லூரி மாணவர்களுக்கு என்ன அரசு உதவித்தொகை கிடைக்கிறது?' },
+      { label: '💼 முத்ரா & தொழில் கடன்கள்', query: 'புதிய தொழில் தொடங்க குறைந்த வட்டி அரசு கடன் திட்டங்கள் எவை?' },
+      { label: '🏥 ஆயுஷ்மான் பாரத் அட்டை', query: 'ஆயுஷ்மான் பாரத் அட்டை மற்றும் இலவச மருத்துவ சிகிச்சை தகுதி என்ன?' },
+      { label: '👩 பெண்கள் & குழந்தைகள் நலம்', query: 'பெண்கள் மற்றும் மகள்களுக்கான அரசு சேமிப்பு மற்றும் நலத்திட்டங்கள்' },
+      { label: '👵 முதியோர் ஓய்வூதியத் திட்டம்', query: 'முதியோர் மற்றும் மூத்த குடிமக்கள் ஓய்வூதிய திட்ட தகுதிகள்' },
     ];
   }
   return [
@@ -183,18 +279,15 @@ export const SchemeAdvisorChat: React.FC = () => {
 
   const isHindi = langCode.startsWith('hi');
   const isOdia = langCode.startsWith('or');
-  const activeSpeechLang = selectedLanguage?.speechCode || (isOdia ? 'or-IN' : isHindi ? 'hi-IN' : 'en-IN');
+  const isPunjabi = langCode.startsWith('pa');
+  const activeSpeechLang = selectedLanguage?.speechCode || selectedLanguage?.code || langCode || (isOdia ? 'or-IN' : isPunjabi ? 'pa-IN' : isHindi ? 'hi-IN' : 'en-IN');
 
   const [inputQuery, setInputQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'msg-init-1',
       sender: 'assistant',
-      text: isOdia
-        ? 'ନମସ୍କାର! 🙏 ମୁଁ ଆପଣଙ୍କର **ମିତ୍ର (Mitra AI)** — ସରକାରୀ ଯୋଜନା ପରାମର୍ଶଦାତା।\n\nମୋତେ ଆପଣଙ୍କ ବିଷୟରେ କୁହନ୍ତୁ — ଯେପରିକି ଆପଣଙ୍କର **ବୟସ (Age)**, **ରାଜ୍ୟ (State)**, **ବୃତ୍ତି (Occupation)**, କିମ୍ବା ଆପଣ କେଉଁ ପ୍ରକାରର ଯୋଜନା ଖୋଜୁଛନ୍ତି (ଛାତ୍ରବୃତ୍ତି, କୃଷକ ସହାୟତା, ବ୍ୟବସାୟ ଋଣ, ସ୍ୱାସ୍ଥ୍ୟ କାର୍ଡ଼, ବାର୍ଦ୍ଧକ୍ୟ ପେନସନ), ଏବଂ ମୁଁ ୩,୮୬୬ ଯୋଜନାରୁ ସଠିକ୍ ସୂଚନା ଦେବି।'
-        : isHindi
-        ? 'नमस्ते! 🙏 मैं आपका **मित्र (Mitra AI)** — सरकारी योजना सलाहकार हूँ।\n\nमुझे अपने बारे में बताएं — जैसे आपकी **आयु (Age)**, **राज्य (State)**, **व्यवसाय (Occupation)**, या आप किस प्रकार की योजना ढूंढ रहे हैं (छात्रवृत्ति, किसान सहायता, बिजनेस लोन, स्वास्थ्य कार्ड, आवास), और मैं आपके लिए 3,866 सत्यापित सरकारी योजनाओं में से सटीक जानकारी दूंगा।'
-        : 'Hello! 👋 I am **Mitra (मित्र)** — your personal AI Welfare & Scheme Advisor.\n\nTell me about yourself — like your **Age**, **State**, **Occupation**, or what support you need (Scholarships, Farming subsidies, Mudra loans, Healthcare, Housing), and I will find verified government welfare schemes for you.',
+      text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
       timestamp: 'Just now',
     },
   ]);
@@ -209,6 +302,34 @@ export const SchemeAdvisorChat: React.FC = () => {
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const initialSentRef = useRef(false);
   const userProfile = getSavedProfile();
+
+  // Listen for speech synthesis voices loaded
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const updateVoices = () => {
+        window.speechSynthesis.getVoices();
+      };
+      updateVoices();
+      window.speechSynthesis.addEventListener('voiceschanged', updateVoices);
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', updateVoices);
+      };
+    }
+  }, []);
+
+  // Sync initial message with language change if user hasn't chatted yet
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].id.startsWith('msg-init')) {
+      setMessages([
+        {
+          id: 'msg-init-1',
+          sender: 'assistant',
+          text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
+          timestamp: 'Just now',
+        },
+      ]);
+    }
+  }, [activeSpeechLang]);
 
   // Voice Input (STT) Hook
   const {
@@ -279,23 +400,22 @@ export const SchemeAdvisorChat: React.FC = () => {
       const cleaned = cleanTextForSpeech(textToSpeak);
       if (!cleaned) return;
 
-      const utterance = new SpeechSynthesisUtterance(cleaned);
-      utterance.lang = activeSpeechLang;
+      // Resume if speech engine was paused
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
+      const voices = window.speechSynthesis.getVoices();
+      const matchedVoice = findBestVoice(voices, activeSpeechLang);
+      const { textToPronounce, speechLang } = prepareSpeechUtterance(cleaned, activeSpeechLang, matchedVoice);
+
+      const utterance = new SpeechSynthesisUtterance(textToPronounce);
+      utterance.lang = speechLang;
       utterance.rate = speechRate;
       utterance.pitch = 1.0;
 
-      // Match system voice for Indic languages
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        const langPrefix = activeSpeechLang.split('-')[0].toLowerCase();
-        const bestVoice =
-          voices.find((v) => v.lang.toLowerCase() === activeSpeechLang.toLowerCase()) ||
-          voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix)) ||
-          voices.find((v) => v.lang.includes('IN')) ||
-          voices[0];
-        if (bestVoice) {
-          utterance.voice = bestVoice;
-        }
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
       }
 
       utterance.onstart = () => {
@@ -314,7 +434,13 @@ export const SchemeAdvisorChat: React.FC = () => {
         setIsSpeechPaused(false);
       };
 
-      window.speechSynthesis.speak(utterance);
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.warn('SpeechSynthesis speak error:', e);
+        }
+      }, 30);
     },
     [activeSpeechLang, speechRate, stopSpeech]
   );
@@ -355,11 +481,7 @@ export const SchemeAdvisorChat: React.FC = () => {
       {
         id: nextMsgId('msg-init'),
         sender: 'assistant',
-        text: isOdia
-          ? 'ନମସ୍କାର! ବାର୍ତ୍ତାଳାପ ପୁନଃସ୍ଥାପିତ ହୋଇଛି। ଆଜି ମିତ୍ର ଆପଣଙ୍କୁ କେଉଁ ସରକାରୀ ଯୋଜନା ଖୋଜିବାରେ ସାହାଯ୍ୟ କରିପାରିବ?'
-          : isHindi
-          ? 'नमस्ते! बातचीत रीसेट कर दी गई है। आज मैं आपकी कौन सी सरकारी योजना खोजने में मदद कर सकता हूँ?'
-          : 'Hello! Chat has been reset. How can Mitra AI help you discover welfare schemes today?',
+        text: getLocalizedText(RESET_MESSAGES, activeSpeechLang),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -394,7 +516,7 @@ export const SchemeAdvisorChat: React.FC = () => {
       }));
 
       const profile = getSavedProfile();
-      const response = await api.askAI(q, history, profile);
+      const response = await api.askAI(q, history, profile, activeSpeechLang);
 
       const matchedSchemes =
         response.referencedSchemes && response.referencedSchemes.length > 0
@@ -420,11 +542,7 @@ export const SchemeAdvisorChat: React.FC = () => {
       }
     } catch {
       const fallbackId = nextMsgId('msg-bot-fallback');
-      const fallbackText = isOdia
-        ? 'ମୁଁ ଆପଣଙ୍କ ଅନୁରୋଧର ବିଶ୍ଳେଷଣ କରୁଛି। ଆପଣ ସିଧାସଳଖ ଯୋଜନା ତାଲିକା ମଧ୍ୟ ଦେଖିପାରିବେ କିମ୍ବା ଯୋଗ୍ୟତା ଯାଞ୍ଚ କରିପାରିବେ।'
-        : isHindi
-        ? 'मैं आपके अनुरोध का विश्लेषण कर रहा हूँ। आप सीधे योजनाओं की सूची भी देख सकते हैं या पात्रता फॉर्म भर सकते हैं।'
-        : 'I am analyzing your request. You can also explore verified schemes directly in the directory or complete the eligibility survey.';
+      const fallbackText = getLocalizedText(FALLBACK_MESSAGES, activeSpeechLang);
 
       const botMsg: ChatMessage = {
         id: fallbackId,
@@ -471,14 +589,16 @@ export const SchemeAdvisorChat: React.FC = () => {
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-            {isOdia ? 'ମିତ୍ର (Mitra AI)' : isHindi ? 'मित्र (Mitra AI)' : 'Mitra — AI Scheme Advisor'}
+            {isOdia ? 'ମିତ୍ର AI' : isHindi ? 'मित्र AI' : 'Mitra AI — Scheme Advisor'}
           </h2>
           <p className="text-xs sm:text-sm text-teal-100/80 max-w-xl leading-relaxed">
             {isOdia
-              ? 'ଆପଣଙ୍କର ବ୍ୟକ୍ତିଗତ AI ସାଥୀ ଯିଏ ୩,୮୬୬ ସରକାରୀ ଯୋଜନାରୁ ଆପଣଙ୍କ ଭାଷାରେ ତତକ୍ଷଣାତ ପରାମର୍ଶ ଦେଇଥାଏ।'
+              ? 'ଆପଣଙ୍କର ବ୍ୟକ୍ତିଗତ AI ସାଥୀ ଯିଏ ସରକାରୀ ଯୋଜନାରୁ ଆପଣଙ୍କ ଭାଷାରେ ତତକ୍ଷଣାତ ପରାମର୍ଶ ଦେଇଥାଏ।'
+              : isPunjabi
+              ? 'ਤੁਹਾਡਾ ਨਿੱਜੀ AI ਮਿੱਤਰ ਜੋ ਸਰਕਾਰੀ ਸਕੀਮਾਂ ਦੇ ਪੂਰੇ ਡਾਟਾਬੇਸ ਤੋਂ ਤੁਹਾਡੀ ਭਾਸ਼ਾ ਵਿੱਚ ਸਹੀ ਸਲਾਹ ਦਿੰਦਾ ਹੈ।'
               : isHindi
-              ? 'आपका व्यक्तिगत AI मित्र जो 3,866 सरकारी योजनाओं के पूरे डेटाबेस से आपकी भाषा में सटीक सलाह देता है।'
-              : 'Your personal AI companion that provides instant eligibility insights across 3,866 verified welfare schemes in Indian languages.'}
+              ? 'आपका व्यक्तिगत AI मित्र जो सरकारी योजनाओं के पूरे डेटाबेस से आपकी भाषा में सटीक सलाह देता है।'
+              : 'Your personal AI companion that provides instant eligibility insights across verified government welfare schemes.'}
           </p>
         </div>
 
@@ -487,7 +607,7 @@ export const SchemeAdvisorChat: React.FC = () => {
           <div className="p-2.5 rounded-2xl bg-teal-900/60 border border-teal-700/60 text-xs text-emerald-300 flex items-center gap-2 shadow-xs">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
             <span className="font-semibold text-xs">
-              {isOdia ? '୩,୮୬୬ ଯୋଜନା ସତ୍ୟାପିତ' : isHindi ? '3,866 सत्यापित योजनाएं' : '3,866 verified schemes'}
+              {isOdia ? '୩,୮୬୬ ଯୋଜନା ସତ୍ୟାପିତ' : isPunjabi ? '3,866 ਪ੍ਰਮਾਣਿਤ ਸਕੀਮਾਂ' : isHindi ? '3,866 सत्यापित योजनाएं' : '3,866 verified schemes'}
             </span>
           </div>
 
@@ -506,7 +626,7 @@ export const SchemeAdvisorChat: React.FC = () => {
               title="Auto-speak incoming responses"
             >
               {isAutoSpeak ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-              <span>{isOdia ? 'ସ୍ୱୟଂଚାଳିତ ସ୍ୱର' : isHindi ? 'ऑटो-वॉइस' : 'Auto Voice'}</span>
+              <span>{isOdia ? 'ସ୍ୱୟଂଚାଳିତ ସ୍ୱର' : isPunjabi ? 'ਆਟੋ-ਵਾਇਸ' : isHindi ? 'ऑटो-वॉइस' : 'Auto Voice'}</span>
             </button>
             <span className="text-slate-600">|</span>
             <button
@@ -526,11 +646,11 @@ export const SchemeAdvisorChat: React.FC = () => {
         <div className="bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-emerald-950 dark:text-emerald-200 shadow-2xs">
           <div className="flex items-center gap-2 overflow-hidden">
             <UserCheck className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
-            <span className="font-bold shrink-0">{isOdia ? 'ପ୍ରୋଫାଇଲ୍ ସଂଯୁକ୍ତ:' : isHindi ? 'प्रोफाइल कनेक्टेड:' : 'Active Profile:'}</span>
+            <span className="font-bold shrink-0">{isOdia ? 'ପ୍ରୋଫାଇଲ୍ ସଂଯୁକ୍ତ:' : isPunjabi ? 'ਪ੍ਰੋਫਾਈਲ ਜੁੜੀ ਹੋਈ:' : isHindi ? 'प्रोफाइल कनेक्टेड:' : 'Active Profile:'}</span>
             <span className="truncate text-emerald-800 dark:text-emerald-300">
               {[
                 userProfile.state ? `📍 ${userProfile.state}` : '',
-                userProfile.age ? `🎂 ${userProfile.age} ${isOdia ? 'ବର୍ଷ' : isHindi ? 'वर्ष' : 'yrs'}` : '',
+                userProfile.age ? `🎂 ${userProfile.age} ${isOdia ? 'ବର୍ଷ' : isPunjabi ? 'ਸਾਲ' : isHindi ? 'वर्ष' : 'yrs'}` : '',
                 userProfile.occupation ? `💼 ${userProfile.occupation}` : '',
                 userProfile.category ? `🏷️ ${userProfile.category}` : '',
               ]
@@ -542,7 +662,7 @@ export const SchemeAdvisorChat: React.FC = () => {
             to="/eligibility"
             className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200 underline shrink-0"
           >
-            {isOdia ? 'ପରିବର୍ତ୍ତନ' : isHindi ? 'बदलें' : 'Edit'}
+            {isOdia ? 'ପରିବର୍ତ୍ତନ' : isPunjabi ? 'ਬਦਲੋ' : isHindi ? 'बदलें' : 'Edit'}
           </Link>
         </div>
       )}
@@ -552,7 +672,7 @@ export const SchemeAdvisorChat: React.FC = () => {
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            <span>{isOdia ? 'ପ୍ରମୁଖ ବିଷୟ:' : isHindi ? 'सुझाए गए विषय:' : 'Suggested Topics:'}</span>
+            <span>{isOdia ? 'ପ୍ରମୁଖ ବିଷୟ:' : isPunjabi ? 'ਸੁਝਾਏ ਗਏ ਵਿਸ਼ੇ:' : isHindi ? 'सुझाए गए विषय:' : 'Suggested Topics:'}</span>
           </span>
           {messages.length > 1 && (
             <button
@@ -561,7 +681,7 @@ export const SchemeAdvisorChat: React.FC = () => {
               title="Clear conversation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>{isOdia ? 'ଚାଟ୍ ରିସେଟ୍' : isHindi ? 'रीसेट चैट' : 'Reset Chat'}</span>
+              <span>{isOdia ? 'ଚାଟ୍ ରିସେଟ୍' : isPunjabi ? 'ਚੈਟ ਰੀਸੈੱਟ' : isHindi ? 'रीसेट चैट' : 'Reset Chat'}</span>
             </button>
           )}
         </div>
@@ -624,7 +744,7 @@ export const SchemeAdvisorChat: React.FC = () => {
                     <div className="space-y-2 pt-2.5 border-t border-slate-200/80 dark:border-slate-700/80">
                       <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-800 dark:text-teal-300">
                         <Compass className="w-3.5 h-3.5" />
-                        <span>{isOdia ? 'ଅନୁଶଂସିତ ସରକାରୀ ଯୋଜନା:' : isHindi ? 'अनुशंसित योजनाएं:' : 'Recommended Verified Schemes:'}</span>
+                        <span>{isOdia ? 'ଅନୁଶଂସିତ ସରକାରୀ ଯୋଜନା:' : isPunjabi ? 'ਸਿਫ਼ਾਰਸ਼ ਕੀਤੀਆਂ ਸਰਕਾਰੀ ਸਕੀମਾਂ:' : isHindi ? 'अनुशंसित योजनाएं:' : 'Recommended Verified Schemes:'}</span>
                       </div>
 
                       <div className="grid grid-cols-1 gap-2">
@@ -640,7 +760,7 @@ export const SchemeAdvisorChat: React.FC = () => {
                               <div className="flex items-center justify-between gap-2">
                                 <StatusPill type="category" value={scheme.category} size="sm" />
                                 <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
-                                  {isOdia ? '✓ ସତ୍ୟାପିତ ଯୋଜନା' : isHindi ? '✓ सत्यापित योजना' : '✓ Verified'}
+                                  {isOdia ? '✓ ସତ୍ୟାପିତ ଯୋଜନା' : isPunjabi ? '✓ ਪ੍ਰମାଣਿਤ ਸਕୀମ' : isHindi ? '✓ सत्यापित योजना' : '✓ Verified'}
                                 </span>
                               </div>
 
@@ -649,34 +769,23 @@ export const SchemeAdvisorChat: React.FC = () => {
                               </h4>
 
                               <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
-                                {scheme.shortDescription || scheme.tagline}
+                                {scheme.shortDescription}
                               </p>
 
                               {benefit && (
-                                <div className="text-[11px] font-semibold text-teal-800 dark:text-teal-300 bg-teal-50/80 dark:bg-teal-950/60 px-2.5 py-1 rounded-lg border dark:border-teal-900/60">
-                                  💰 {benefit.amountOrValue || benefit.title || benefit.description}
+                                <div className="text-[11px] font-bold text-teal-800 dark:text-emerald-400 flex items-center gap-1 pt-1 border-t border-slate-100 dark:border-slate-700">
+                                  <Sparkles className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{benefit.amountOrValue || benefit.title}</span>
                                 </div>
                               )}
 
-                              <div className="pt-1.5 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-700/60">
-                                {scheme.verification?.officialPortalUrl ? (
-                                  <a
-                                    href={scheme.verification.officialPortalUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-teal-700 dark:hover:text-teal-400"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>{isOdia ? 'ଅଫିସିଆଲ୍ ପୋର୍ଟାଲ୍' : isHindi ? 'ऑफिशियल पोर्टल' : 'Official Portal'}</span>
-                                  </a>
-                                ) : <span />}
-
+                              <div className="pt-1 flex items-center justify-end">
                                 <Link
                                   to={`/schemes/${scheme.slug}`}
-                                  className="inline-flex items-center gap-1 text-xs font-bold text-teal-800 dark:text-teal-400 hover:text-teal-950 dark:hover:text-teal-300"
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 dark:text-teal-400 hover:underline"
                                 >
-                                  <span>{t('scheme_card.view_details', undefined, isOdia ? 'ସମ୍ପୂର୍ଣ୍ଣ ବିବରଣୀ' : isHindi ? 'योजना देखें' : 'View Details')}</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
+                                  <span>{isOdia ? 'ବିବରଣୀ ଦେଖନ୍ତୁ' : isPunjabi ? 'ਵੇରਵੇ ਵੇਖੋ' : isHindi ? 'विवरण देखें' : 'View Details'}</span>
+                                  <ArrowRight className="w-3 h-3" />
                                 </Link>
                               </div>
                             </div>
@@ -749,12 +858,12 @@ export const SchemeAdvisorChat: React.FC = () => {
                           {copiedMsgId === msg.id ? (
                             <>
                               <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                              <span className="text-emerald-700 dark:text-emerald-400 font-bold">{isHindi ? 'कॉपी हुआ!' : 'Copied!'}</span>
+                              <span className="text-emerald-700 dark:text-emerald-400 font-bold">{isOdia ? 'କପି ହେଲା!' : isPunjabi ? 'ਕਾਪੀ ਹੋ ਗਿਆ!' : isHindi ? 'कॉपी हुआ!' : 'Copied!'}</span>
                             </>
                           ) : (
                             <>
                               <Copy className="w-3 h-3 text-slate-600 dark:text-slate-400" />
-                              <span>{isHindi ? 'कॉपी' : 'Copy'}</span>
+                              <span>{isOdia ? 'କପି' : isPunjabi ? 'ਕਾਪੀ' : isHindi ? 'कॉपी' : 'Copy'}</span>
                             </>
                           )}
                         </button>
@@ -785,6 +894,8 @@ export const SchemeAdvisorChat: React.FC = () => {
                 <span className="font-medium text-slate-700 dark:text-slate-300 ml-1">
                   {isOdia
                     ? 'ମିତ୍ର AI ବିଶ୍ଳେଷଣ କରୁଛି...'
+                    : isPunjabi
+                    ? 'ਮਿੱਤਰ AI ਸੋਚ ਰਿਹਾ ਹੈ...'
                     : isHindi
                     ? 'मित्र AI सोच रहा है...'
                     : 'Mitra AI is thinking...'}
@@ -802,9 +913,9 @@ export const SchemeAdvisorChat: React.FC = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600"></span>
               </span>
-              <span className="shrink-0">{isOdia ? 'ଶୁଣୁଛି...' : isHindi ? 'सुन रहा हूँ... बोलिए:' : 'Listening... Speak now:'}</span>
+              <span className="shrink-0">{isOdia ? 'ଶୁଣୁଛି...' : isPunjabi ? 'ਸੁਣ ਰਿਹਾ ਹਾਂ... ਬੋଲੋ:' : isHindi ? 'सुन रहा हूँ... बोलिए:' : 'Listening... Speak now:'}</span>
               <span className="italic truncate text-rose-700 dark:text-rose-300 font-normal">
-                {interimTranscript || transcript || (isOdia ? 'ଆପଣଙ୍କ ପ୍ରଶ୍ନ କୁହନ୍ତୁ...' : isHindi ? 'अपनी भाषा में बोलें...' : 'Speak your question...')}
+                {interimTranscript || transcript || (isOdia ? 'ଆପଣଙ୍କ ପ୍ରଶ୍ନ କୁହନ୍ତୁ...' : isPunjabi ? 'ਆਪਣੀ ਭାਸ਼ਾ ਵਿੱਚ ਬୋਲੋ...' : isHindi ? 'अपनी भाषा में बोलें...' : 'Speak your question...')}
               </span>
             </div>
             <button
@@ -812,7 +923,7 @@ export const SchemeAdvisorChat: React.FC = () => {
               onClick={stopListening}
               className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 cursor-pointer shadow-xs"
             >
-              {isOdia ? 'ସମାପ୍ତ କରନ୍ତୁ' : isHindi ? 'रोकें' : 'Done'}
+              {isOdia ? 'ସମାପ୍ତ କରନ୍ତୁ' : isPunjabi ? 'ਰੋਕੋ' : isHindi ? 'रोकें' : 'Done'}
             </button>
           </div>
         )}
@@ -861,6 +972,8 @@ export const SchemeAdvisorChat: React.FC = () => {
                   ? 'Listening... Click to stop'
                   : isOdia
                   ? 'ମାଇକ୍ ସହିତ କୁହନ୍ତୁ (Voice Input)'
+                  : isPunjabi
+                  ? 'ਮਾਈਕ ਨਾਲ ਬੋਲੋ (Voice Input)'
                   : isHindi
                   ? 'माइक से बोलें (Voice Input)'
                   : 'Click to speak in your language (Voice Input)'
@@ -874,9 +987,11 @@ export const SchemeAdvisorChat: React.FC = () => {
               type="text"
               placeholder={
                 isListening
-                  ? isOdia ? 'ଶୁଣୁଛି... କୁହନ୍ତୁ...' : isHindi ? 'सुन रहा हूँ... बोलिए...' : 'Listening... Speak now...'
+                  ? isOdia ? 'ଶୁଣୁଛି... କୁହନ୍ତୁ...' : isPunjabi ? 'ਸੁਣ ਰਿਹਾ ਹਾਂ... ਬੋਲੋ...' : isHindi ? 'सुन रहा हूँ... बोलिए...' : 'Listening... Speak now...'
                   : isOdia
                   ? 'ଆପଣଙ୍କ ଭାଷାରେ ଯେକୌଣସି ପ୍ରଶ୍ନ ପଚାରନ୍ତୁ କିମ୍ବା ମାଇକ୍ ବଟନ୍ ଦବାନ୍ତୁ...'
+                  : isPunjabi
+                  ? 'ਆਪਣੀ ਭାਸ਼ਾ ਵਿੱਚ ਕੋਈ ਵੀ ਸਵਾਲ ਪੁੱਛੋ ਜਾਂ ਮਾਈਕ ਦਬਾ ਕੇ ਬੋਲੋ...'
                   : isHindi
                   ? 'अपनी भाषा में कुछ भी पूछें या माइक दबाकर बोलें...'
                   : 'Type your question or click mic to speak in your language...'

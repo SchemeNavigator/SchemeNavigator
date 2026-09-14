@@ -33,6 +33,12 @@ export const useVoiceRecognition = (options: UseVoiceRecognitionOptions = {}) =>
     onErrorRef.current = options.onError;
   });
 
+  useEffect(() => {
+    if (options.language && options.language !== language) {
+      setLanguageState(options.language);
+    }
+  }, [options.language]);
+
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       try {

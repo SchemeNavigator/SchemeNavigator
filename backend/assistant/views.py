@@ -47,12 +47,14 @@ class AssistantChatView(APIView):
 
         history = request.data.get("history", [])
         profile = request.data.get("profile", None)
+        language = request.data.get("language", "en-IN")
 
         agent = AssistantAgent()
         result = agent.chat(
             history=history,
             message=message,
             current_profile=profile,
+            language=language,
         )
 
         answer = result["answer"]

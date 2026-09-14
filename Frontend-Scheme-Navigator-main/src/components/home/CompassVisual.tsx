@@ -9,17 +9,19 @@ import {
   Zap,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export const CompassVisual: React.FC = () => {
+  const { t, tp } = useTranslation();
   const [activeCard, setActiveCard] = useState<string | null>(null);
 
   const satelliteCards = [
     {
       id: 'edu',
-      title: 'Scholarships & Grants',
-      badge: 'Education',
-      match: '96% Match',
-      amount: 'Up to ₹20,000/yr',
+      title: t('visual.scholarshipsGrants', undefined, 'Scholarships & Grants'),
+      badge: tp('Education'),
+      match: `96% ${t('explore.matchScore', undefined, 'Match')}`,
+      amount: tp('Up to ₹20,000/yr'),
       icon: GraduationCap,
       color: 'from-blue-600 via-indigo-600 to-indigo-700',
       badgeBg: 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800',
@@ -30,10 +32,10 @@ export const CompassVisual: React.FC = () => {
     },
     {
       id: 'agri',
-      title: 'PM-KISAN & Subsidies',
-      badge: 'Agriculture',
-      match: '94% Match',
-      amount: '₹6,000/yr DBT',
+      title: t('visual.pmKisanSubsidies', undefined, 'PM-KISAN & Subsidies'),
+      badge: tp('Agriculture'),
+      match: `94% ${t('explore.matchScore', undefined, 'Match')}`,
+      amount: tp('₹6,000/yr DBT'),
       icon: Sprout,
       color: 'from-emerald-500 via-teal-600 to-teal-800',
       badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
@@ -44,10 +46,10 @@ export const CompassVisual: React.FC = () => {
     },
     {
       id: 'biz',
-      title: 'Mudra & MSME Loans',
-      badge: 'Business',
-      match: '91% Match',
-      amount: 'Collateral-Free ₹20L',
+      title: t('visual.mudraLoans', undefined, 'Mudra & MSME Loans'),
+      badge: tp('Business'),
+      match: `91% ${t('explore.matchScore', undefined, 'Match')}`,
+      amount: tp('Collateral-Free ₹20L'),
       icon: Briefcase,
       color: 'from-purple-600 via-violet-600 to-indigo-800',
       badgeBg: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800',
@@ -58,10 +60,10 @@ export const CompassVisual: React.FC = () => {
     },
     {
       id: 'housing',
-      title: 'Pucca House Subsidy',
-      badge: 'Housing',
-      match: '88% Match',
-      amount: '₹1.30 Lakh Grant',
+      title: t('visual.puccaHouseSubsidy', undefined, 'Pucca House Subsidy'),
+      badge: tp('Housing'),
+      match: `88% ${t('explore.matchScore', undefined, 'Match')}`,
+      amount: tp('₹1.30 Lakh Grant'),
       icon: Home,
       color: 'from-amber-500 via-orange-600 to-red-600',
       badgeBg: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800',
@@ -87,11 +89,11 @@ export const CompassVisual: React.FC = () => {
             </div>
             <div>
               <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>Live Welfare Radar</span>
+                <span>{t('visual.liveRadar', undefined, 'Live Welfare Radar')}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
               </div>
               <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                3,866 Verified Entitlements
+                {t('visual.verifiedEntitlements', undefined, '3,866 Verified Entitlements')}
               </span>
             </div>
           </div>
@@ -99,7 +101,7 @@ export const CompassVisual: React.FC = () => {
             to="/explore"
             className="text-[11px] font-extrabold text-teal-800 dark:text-emerald-400 hover:underline flex items-center gap-0.5 active:scale-95 transition-transform"
           >
-            <span>Explore All</span>
+            <span>{t('visual.exploreAll', undefined, 'Explore All')}</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -140,9 +142,9 @@ export const CompassVisual: React.FC = () => {
         <div className="pt-0.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium px-1">
           <span className="flex items-center gap-1">
             <Zap className="w-3 h-3 text-amber-500" />
-            <span>Updated hourly from data.gov.in</span>
+            <span>{t('visual.updatedHourly', undefined, 'Updated hourly from data.gov.in')}</span>
           </span>
-          <span className="text-teal-700 dark:text-emerald-400 font-bold">100% Free</span>
+          <span className="text-teal-700 dark:text-emerald-400 font-bold">{t('cta.free', undefined, '100% Free')}</span>
         </div>
       </div>
 
@@ -203,7 +205,7 @@ export const CompassVisual: React.FC = () => {
           {/* Center Badge Floating Label */}
           <div className="absolute -bottom-4 px-3 py-1 rounded-full bg-gradient-to-r from-teal-900 to-slate-950 backdrop-blur-md border border-emerald-400/50 text-[10px] font-extrabold text-emerald-300 shadow-xl flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-emerald-300 animate-pulse" />
-            <span>Intelligent Compass</span>
+            <span>{t('visual.intelligentCompass', undefined, 'Intelligent Compass')}</span>
           </div>
         </div>
 

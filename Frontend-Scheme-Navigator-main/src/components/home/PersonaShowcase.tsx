@@ -63,7 +63,7 @@ export const PersonaShowcase: React.FC = () => {
             <span>{t('persona.title')}</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-950 dark:text-white tracking-tight">
-            Explore Personalized Support by Profile
+            {t('persona.exploreProfiles')}
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed">
             {t('persona.subtitle')}
@@ -102,10 +102,10 @@ export const PersonaShowcase: React.FC = () => {
                 <span>{tp(currentPersona.label)}</span>
               </div>
               <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight">
-                {currentPersona.headline}
+                {tp(currentPersona.headline)}
               </h3>
               <p className="text-sm sm:text-base text-teal-100/90 leading-relaxed font-normal">
-                {currentPersona.description}
+                {tp(currentPersona.description)}
               </p>
 
               <div className="pt-3">
@@ -119,7 +119,7 @@ export const PersonaShowcase: React.FC = () => {
                       className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-teal-900/90 border border-teal-600/60 text-xs font-semibold text-white shadow-xs backdrop-blur-md"
                     >
                       <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{scheme}</span>
+                      <span>{tp(scheme)}</span>
                     </span>
                   ))}
                 </div>
@@ -130,7 +130,7 @@ export const PersonaShowcase: React.FC = () => {
               <div>
                 <span className="text-xs text-emerald-300 font-bold tracking-wide uppercase">{t('hero.guidance')}</span>
                 <div className="text-lg font-black text-white mt-1">
-                  1-Click Scheme Matching
+                  {t('persona.oneClickMatching')}
                 </div>
               </div>
 

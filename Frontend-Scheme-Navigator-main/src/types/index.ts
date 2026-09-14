@@ -160,7 +160,7 @@ export interface MatchFactor {
 export interface SchemeMatchResult {
   scheme: Scheme;
   matchScore: number; // 0 - 100
-  matchGrade: 'High Potential' | 'Good Match' | 'Moderate Match' | 'General Match';
+  matchGrade: 'High Potential' | 'Good Match' | 'Moderate Match' | 'General Match' | 'Not Eligible';
   whyGood?: string;
   toNote?: string;
   matchedReasons: string[];
@@ -190,3 +190,5 @@ export interface TrackerItem {
   externalApplicationDate?: string;
   updatedAt: string;
 }
+
+

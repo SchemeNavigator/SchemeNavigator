@@ -12,14 +12,33 @@
  */
 
 import type { UserProfile, SchemeMatchResult, TrackerItem, Scheme } from '../types';
+import { getCachedRecommendations, saveCachedRecommendations } from './storageService';
 
 class HttpApiClient {
   private baseUrl: string;
   private _token: string | null = null;
   private _tokenPromise: Promise<string> | null = null;
+  private _cache = new Map<string, { data: any; expiry: number }>();
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // strip trailing slash
+  }
+
+  private getCached<T>(key: string): T | null {
+    const entry = this._cache.get(key);
+    if (entry && entry.expiry > Date.now()) {
+      return entry.data as T;
+    }
+    this._cache.delete(key);
+    return null;
+  }
+
+  private setCached(key: string, data: any, ttlMs: number = 60000) {
+    this._cache.set(key, { data, expiry: Date.now() + ttlMs });
+  }
+
+  public clearCache() {
+    this._cache.clear();
   }
 
   // ── Token management ──────────────────────────────────────────────────────
@@ -149,6 +168,12 @@ class HttpApiClient {
       profile: UserProfile;
       recommendations: SchemeMatchResult[];
     }>('/api/survey/submit/', { profile });
+    if (data?.recommendations && Array.isArray(data.recommendations)) {
+      const cacheKey = `recs_${JSON.stringify(profile || {})}`;
+      this.setCached(cacheKey, data.recommendations, 180000);
+      this.setCached('recs_latest', data.recommendations, 180000);
+      saveCachedRecommendations(data.recommendations);
+    }
     return data;
   }
 
@@ -166,17 +191,49 @@ class HttpApiClient {
   // ── Recommendations ───────────────────────────────────────────────────────
 
   async getRecommendations(profile?: UserProfile): Promise<SchemeMatchResult[]> {
+    const profileKey = profile ? JSON.stringify({
+      age: profile.age,
+      gender: profile.gender,
+      state: profile.state,
+      occupation: profile.employmentType || profile.occupation,
+      income: profile.incomeRange,
+      category: profile.category,
+      bpl: profile.hasBPLCard || profile.isBPL,
+      disability: profile.isDisability || profile.hasDisability,
+    }) : 'default';
+
+    const cacheKey = `recs_${profileKey}`;
+    const cached = this.getCached<SchemeMatchResult[]>(cacheKey);
+    if (cached && cached.length > 0) return cached;
+
+    // Only fallback to generic latest cache if NO specific profile was requested
+    if (!profile) {
+      const persistentCached = getCachedRecommendations();
+      if (persistentCached && persistentCached.length > 0) {
+        return persistentCached;
+      }
+    }
+
+    let recs: SchemeMatchResult[];
     if (profile) {
       const data = await this.post<{ recommendations: SchemeMatchResult[] }>(
         '/api/recommendations/',
         { profile }
       );
-      return data.recommendations;
+      recs = data.recommendations;
+    } else {
+      const data = await this.request<{ recommendations: SchemeMatchResult[] }>(
+        '/api/recommendations/'
+      );
+      recs = data.recommendations;
     }
-    const data = await this.request<{ recommendations: SchemeMatchResult[] }>(
-      '/api/recommendations/'
-    );
-    return data.recommendations;
+
+    if (recs && recs.length > 0) {
+      this.setCached(cacheKey, recs, 180000);
+      this.setCached('recs_latest', recs, 180000);
+      saveCachedRecommendations(recs);
+    }
+    return recs;
   }
 
   // ── Schemes catalogue ─────────────────────────────────────────────────────
@@ -194,11 +251,24 @@ class HttpApiClient {
     if (params?.page) qs.set('page', String(params.page));
 
     const path = `/api/schemes/${qs.toString() ? '?' + qs.toString() : ''}`;
-    return this.request<{
+    const cacheKey = `schemes_${path}`;
+    const cached = this.getCached<{
+      schemes: Scheme[];
+      categoryCounts?: Record<string, number>;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(cacheKey);
+    if (cached) return cached;
+
+    const res = await this.request<{
       schemes: Scheme[];
       categoryCounts?: Record<string, number>;
       pagination: { page: number; limit: number; total: number; totalPages: number };
     }>(path);
+
+    if (res) {
+      this.setCached(cacheKey, res, 60000); // 60 sec cache
+    }
+    return res;
   }
 
   async getScheme(idOrSlug: string): Promise<Scheme | undefined> {
@@ -240,7 +310,8 @@ class HttpApiClient {
   async askAI(
     query: string,
     history?: Array<{ role: string; content: string }>,
-    profile?: UserProfile | null
+    profile?: UserProfile | null,
+    language?: string
   ): Promise<{
     answer: string;
     referencedSchemes?: Scheme[];
@@ -256,6 +327,7 @@ class HttpApiClient {
       message: query,
       history: history || [],
       profile: profile || undefined,
+      language: language || 'en-IN',
     });
     return {
       answer: data.answer,

@@ -16,9 +16,10 @@ import {
   Loader2,
 } from 'lucide-react';
 import { isSchemeSaved, toggleSaveScheme } from '../services/storageService';
+import { translateSchemeContent } from '../utils/schemeTranslator';
 
 export const ExplorePage: React.FC = () => {
-  const { t, tCategory, tState } = useTranslation();
+  const { t, tCategory, tState, langCode } = useTranslation();
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'All';
   const initialState = searchParams.get('state') || 'All India';
@@ -84,7 +85,7 @@ export const ExplorePage: React.FC = () => {
         });
 
         if (res?.categoryCounts) {
-          setCategoryCounts((prev) => ({ ...prev, ...res.categoryCounts }));
+          setCategoryCounts(res.categoryCounts);
         }
 
         if (res?.schemes) {
@@ -125,7 +126,7 @@ export const ExplorePage: React.FC = () => {
       (acc, c) => acc + (typeof c === 'number' ? c : 0),
       0
     );
-    return sum > 0 ? sum : 3866;
+    return sum;
   }, [categoryCounts]);
 
   const displayedSchemes = useMemo(() => {
@@ -302,7 +303,8 @@ export const ExplorePage: React.FC = () => {
         ) : displayedSchemes.length > 0 ? (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayedSchemes.map((scheme) => {
+              {displayedSchemes.map((rawScheme) => {
+                const scheme = translateSchemeContent(rawScheme, langCode);
                 const isSaved = isSchemeSaved(scheme.id || scheme.slug);
                 const mainBenefit = Array.isArray(scheme.benefits) ? scheme.benefits[0] : null;
 
