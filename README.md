@@ -230,7 +230,7 @@ docker-compose up --build
 
 The frontend is continuously built and deployed to **GitHub Pages** on every push to the `master` branch via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
-- **Live URL**: [https://aidivi265.github.io/Scheme-Navigator-App/](https://aidivi265.github.io/Scheme-Navigator-App/)
+- **Live URL**: https://schemenavigator.github.io/SchemeNavigator/
 
 ---
 
