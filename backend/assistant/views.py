@@ -32,6 +32,51 @@ class AssistantMessagesView(APIView):
         return Response({"messages": []})
 
 
+SLUG_ALIASES = {
+    "ayushman-bharat": "ayushman-bharat-pmjay",
+    "pmjay": "ayushman-bharat-pmjay",
+    "pm-jay": "ayushman-bharat-pmjay",
+    "ayushman-card": "ayushman-bharat-pmjay",
+    "ayushman": "ayushman-bharat-pmjay",
+    "vaya-vandana": "ayushman-vaya-vandana-senior-citizens",
+    "pm-kisan": "pm-kisan-samman-nidhi",
+    "pmkisan": "pm-kisan-samman-nidhi",
+    "kisan-samman-nidhi": "pm-kisan-samman-nidhi",
+    "mudra": "pradhan-mantri-mudra-yojana",
+    "mudra-loan": "pradhan-mantri-mudra-yojana",
+    "pmmy": "pradhan-mantri-mudra-yojana",
+    "pmay": "pmay-g",
+    "pm-awas": "pmay-g",
+    "pmay-gramin": "pmay-g",
+    "sukanya": "sukanya-samriddhi-yojana",
+    "sukanya-samriddhi": "sukanya-samriddhi-yojana",
+    "ssy": "sukanya-samriddhi-yojana",
+    "svanidhi": "pm-svanidhi",
+    "pm-svanidhi": "pm-svanidhi",
+    "vishwakarma": "pm-vishwakarma",
+    "pm-vishwakarma": "pm-vishwakarma",
+    "kusum": "pm-kusum-solar-pump-scheme",
+    "pm-kusum": "pm-kusum-solar-pump-scheme",
+    "fasal-bima": "pradhan-mantri-fasal-bima-yojana",
+    "pmfby": "pradhan-mantri-fasal-bima-yojana",
+    "kcc": "kisan-credit-card-kcc",
+    "kisan-credit-card": "kisan-credit-card-kcc",
+    "atal-pension": "atal-pension-yojana",
+    "apy": "atal-pension-yojana",
+    "suraksha-bima": "pradhan-mantri-suraksha-bima-yojana",
+    "pmsby": "pradhan-mantri-suraksha-bima-yojana",
+    "jeevan-jyoti": "pradhan-mantri-jeevan-jyoti-bima-yojana",
+    "pmjjby": "pradhan-mantri-jeevan-jyoti-bima-yojana",
+    "matru-vandana": "pradhan-mantri-matru-vandana-yojana",
+    "pmmvy": "pradhan-mantri-matru-vandana-yojana",
+    "ujjwala": "pradhan-mantri-ujjwala-yojana",
+    "pm-ujjwala": "pradhan-mantri-ujjwala-yojana",
+    "mgnrega": "mahatma-gandhi-nrega-mgnrega",
+    "nrega": "mahatma-gandhi-nrega-mgnrega",
+    "stand-up-india": "stand-up-india-scheme",
+}
+
+
 class AssistantChatView(APIView):
     """
     POST /api/assistant/chat/
@@ -40,7 +85,12 @@ class AssistantChatView(APIView):
     """
 
     def post(self, request):
-        _require_session(request)
+        # Allow guest chat without blocking on session token
+        try:
+            _require_session(request)
+        except Exception:
+            pass
+
         message = (request.data.get("message") or "").strip()
         if not message:
             return Response({"error": "message is required"}, status=400)
@@ -61,11 +111,34 @@ class AssistantChatView(APIView):
         referenced_ids = result.get("referenced_scheme_ids", [])
         updated_profile = result.get("updated_profile")
 
-        # Hydrate referenced scheme objects
+        # Hydrate referenced scheme objects using exact match, alias mapping, or fuzzy search
         referenced_schemes = []
         if referenced_ids:
-            schemes_qs = Scheme.objects.filter(slug__in=referenced_ids)
-            referenced_schemes = SchemeSerializer(schemes_qs, many=True).data
+            from django.db.models import Q
+            matched_objs = []
+            seen_ids = set()
+
+            for raw_slug in referenced_ids:
+                s_clean = raw_slug.strip().lower()
+                target_slug = SLUG_ALIASES.get(s_clean, s_clean)
+
+                # 1. Exact match
+                scheme_obj = Scheme.objects.filter(slug=target_slug).first()
+
+                # 2. Substring or short name match if not found
+                if not scheme_obj:
+                    scheme_obj = Scheme.objects.filter(
+                        Q(slug__icontains=s_clean)
+                        | Q(short_name__iexact=s_clean)
+                        | Q(name__icontains=s_clean)
+                    ).first()
+
+                if scheme_obj and scheme_obj.id not in seen_ids:
+                    matched_objs.append(scheme_obj)
+                    seen_ids.add(scheme_obj.id)
+
+            if matched_objs:
+                referenced_schemes = SchemeSerializer(matched_objs, many=True).data
 
         return Response(
             {

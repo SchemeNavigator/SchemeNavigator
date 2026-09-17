@@ -7,6 +7,7 @@
 
 import { Scheme } from '../types';
 import { SchemeDeadlineInfo } from './schemeDeadlines';
+import { getSafeOfficialUrl } from '../components/common/ExternalPortalModal';
 
 function formatToIcsDate(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -14,24 +15,18 @@ function formatToIcsDate(date: Date): string {
   const m = pad(date.getUTCMonth() + 1);
   const d = pad(date.getUTCDate());
   const hh = pad(date.getUTCHours());
-  const mm = pad(date.getUTCMinutes());
-  const ss = pad(date.getUTCSeconds());
-  return `${y}${m}${d}T${hh}${mm}${ss}Z`;
-}
-
-function formatToGoogleDate(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const y = date.getUTCFullYear();
-  const m = pad(date.getUTCMonth() + 1);
-  const d = pad(date.getUTCDate());
-  const hh = pad(date.getUTCHours());
-  const mm = pad(date.getUTCMinutes());
-  const ss = pad(date.getUTCSeconds());
-  return `${y}${m}${d}T${hh}${mm}${ss}Z`;
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
 /**
- * Generate and trigger download of RFC 5545 compliant .ics iCalendar file
+ * Format a Date object to Google Calendar format: YYYYMMDDTHHMMSSZ
+ */
+function formatToGoogleDate(date: Date): string {
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+
+/**
+ * Generate and trigger download of an .ics file for calendar import.
  * Supported natively by Apple Calendar, Google Calendar, and Microsoft Outlook.
  */
 export function downloadIcsFile(
@@ -41,7 +36,7 @@ export function downloadIcsFile(
   const now = new Date();
   const schemeName = scheme.name || 'Government Scheme';
   const slug = (scheme.slug || scheme.id || 'scheme').replace(/[^a-z0-9-_]/gi, '-');
-  const portalUrl = scheme.verification?.officialPortalUrl || 'https://services.india.gov.in';
+  const portalUrl = getSafeOfficialUrl(scheme as Scheme);
   const ministry = scheme.verification?.ministryOrAuthority || 'Government of India';
   const helpline = scheme.verification?.helpline || '1800-111-555';
 
@@ -126,7 +121,7 @@ export function getGoogleCalendarUrl(
 ): string {
   const now = new Date();
   const schemeName = scheme.name || 'Government Scheme';
-  const portalUrl = scheme.verification?.officialPortalUrl || 'https://services.india.gov.in';
+  const portalUrl = getSafeOfficialUrl(scheme as Scheme);
   const ministry = scheme.verification?.ministryOrAuthority || 'Government Department';
 
   const targetDate = deadlineInfo.deadlineDate || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -169,7 +164,7 @@ export function getOutlookCalendarUrl(
 ): string {
   const now = new Date();
   const schemeName = scheme.name || 'Government Scheme';
-  const portalUrl = scheme.verification?.officialPortalUrl || 'https://services.india.gov.in';
+  const portalUrl = getSafeOfficialUrl(scheme as Scheme);
 
   const targetDate = deadlineInfo.deadlineDate || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const startDate = new Date(targetDate.getTime() - 2 * 60 * 60 * 1000);

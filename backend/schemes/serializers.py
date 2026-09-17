@@ -5,6 +5,10 @@ and returned verbatim, so no nested serializer indirection is needed.
 """
 from rest_framework import serializers
 from .models import Scheme
+import re
+from urllib.parse import urlparse, parse_qs
+
+URL_REGEX = re.compile(r'https?://[^\s\'"<>]+')
 
 
 # Direct Official Portal Mapping Registry
@@ -144,6 +148,78 @@ def resolve_direct_portal_url(slug: str, name: str, covered_states: list, dept: 
     return 'https://services.india.gov.in'
 
 
+def extract_clean_portal_url(raw_val: str, slug: str = '', name: str = '', covered_states: list = None, dept: str = '') -> str:
+    if not raw_val or str(raw_val).strip() in ('#', 'none', 'None', 'null', ''):
+        return resolve_direct_portal_url(slug, name, covered_states or [], dept)
+
+    cleaned = re.sub(r'chrome-extension://[a-z0-9]+/https?://', 'https://', str(raw_val))
+    cleaned = re.sub(r'chrome-extensionhttps?://', 'https://', cleaned)
+
+    lines = [l.strip() for l in cleaned.splitlines() if l.strip() and not l.strip().startswith('file:///')]
+    if not lines:
+        return resolve_direct_portal_url(slug, name, covered_states or [], dept)
+
+    candidates = []
+    priority_keywords = [
+        (['official website', 'official portal', 'portal', 'website', 'online application', 'apply', 'registration', 'apply online', 'portal login'], 120),
+        (['sanman portal', 'sso', 'edistrict', 'service', 'dbt', 'mahaonline', 'e-services'], 100),
+        (['application form', 'application status', 'scheme details', 'detail', 'details', 'about'], 80),
+        (['guidelines', 'guideline', 'notification', 'circular', 'order', 'amendment', 'press release'], 50),
+        (['user manual', 'faq', 'contact'], 30),
+    ]
+
+    for line in lines:
+        found_urls = URL_REGEX.findall(line)
+        for u in found_urls:
+            u = u.rstrip('.,;)]#\'"')
+            if not u.startswith('http'):
+                continue
+            if 'google.co.in/url?' in u or 'google.com/url?' in u:
+                try:
+                    p = urlparse(u)
+                    qs = parse_qs(p.query)
+                    if 'url' in qs:
+                        u = qs['url'][0]
+                except Exception:
+                    pass
+            if 'translate.goog' in u:
+                u = re.sub(r'([a-zA-Z0-9\-]+)-([a-zA-Z0-9\-]+)-gov-in\.translate\.goog', r'\1.\2.gov.in', u)
+                u = re.sub(r'([a-zA-Z0-9\-]+)-gov-in\.translate\.goog', r'\1.gov.in', u)
+                u = re.sub(r'\.translate\.goog', '', u)
+            if ':8080' in u:
+                u = u.replace(':8080', '')
+
+            line_lower = line.lower()
+            score = 10
+            for kws, s_val in priority_keywords:
+                if any(kw in line_lower for kw in kws):
+                    score = s_val
+                    break
+            try:
+                domain = urlparse(u).netloc.lower()
+                if any(domain.endswith(tld) for tld in ['.gov.in', '.nic.in']):
+                    score += 50
+                elif any(domain.endswith(tld) for tld in ['.org.in', '.ac.in', '.res.in', '.edu.in', '.in']):
+                    score += 20
+                if any(bad in domain for bad in ['drive.google.com', 'docs.google.com', 'dropbox.com', 'amazonaws.com', 'govtschemes.in', 'google.com', 'google.co.in']):
+                    score -= 100
+            except Exception:
+                continue
+
+            if u.lower().endswith('.pdf'):
+                score -= 25
+            else:
+                score += 15
+            candidates.append((score, u))
+
+    if not candidates:
+        return resolve_direct_portal_url(slug, name, covered_states or [], dept)
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    if candidates[0][0] <= 0:
+        return resolve_direct_portal_url(slug, name, covered_states or [], dept)
+    return candidates[0][1]
+
+
 class SchemeSerializer(serializers.ModelSerializer):
     # Expose the database PK as 'id' to match TypeScript Scheme.id
     id = serializers.CharField(source="slug")
@@ -184,9 +260,8 @@ class SchemeSerializer(serializers.ModelSerializer):
 
         ver = data.get("verification") or {}
         dept = (ver.get("sourceDepartment") or ver.get("ministryOrAuthority") or "Government Department") if isinstance(ver, dict) else "Government Department"
-        portal_url = ver.get("officialPortalUrl") if isinstance(ver, dict) else ""
-        if not portal_url or portal_url == "#" or "myscheme.gov.in" in portal_url:
-            portal_url = resolve_direct_portal_url(instance.slug, instance.name, covered, dept)
+        raw_portal = ver.get("officialPortalUrl") if isinstance(ver, dict) else ""
+        portal_url = extract_clean_portal_url(raw_portal, instance.slug, instance.name, covered, dept)
 
         # Normalize documents
         docs = []

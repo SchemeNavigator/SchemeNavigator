@@ -64,6 +64,42 @@ export const ExplainabilityBox: React.FC<ExplainabilityBoxProps> = ({
         </div>
       </div>
 
+      {/* 0-Based Score Tracking Ledger Table */}
+      {match.factors && match.factors.length > 0 && match.matchScore > 0 && (
+        <div className="p-4 rounded-2xl bg-black/30 border border-teal-800/60 space-y-3">
+          <div className="flex items-center justify-between text-xs border-b border-teal-800/40 pb-2">
+            <span className="font-extrabold uppercase tracking-wider text-emerald-400">
+              Score Tracked From 0 Baseline
+            </span>
+            <span className="font-mono font-bold text-emerald-300">
+              Total: {match.matchScore} / 100 pts
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {match.factors.slice(0, 4).map((f, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-200 font-medium">{f.criterion}</span>
+                  <span className="font-mono font-bold text-emerald-400">
+                    +{f.score} / {f.weight} pts
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full"
+                    style={{ width: `${Math.min(100, (f.score / f.weight) * 100)}%` }}
+                  />
+                </div>
+                {f.explanation && (
+                  <span className="text-[10px] text-teal-200/80 block">{f.explanation}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Matched Reasons List */}
       <div className="space-y-2.5">
         {match.matchedReasons.map((reason, idx) => (

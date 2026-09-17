@@ -7,6 +7,9 @@ import { toggleSaveScheme, addSchemeToTracker } from '../../services/storageServ
 import { useTranslation } from '../../hooks/useTranslation';
 import { DeadlineTicker } from '../calendar/DeadlineTicker';
 import { YojanaCalendarModal } from '../calendar/YojanaCalendarModal';
+import { YojanaCalendarBanner } from '../calendar/YojanaCalendarBanner';
+import { getSchemeDeadline } from '../../utils/schemeDeadlines';
+import { getGoogleCalendarUrl } from '../../utils/calendarSync';
 
 interface SavedSchemesManagerProps {
   schemes: Scheme[];
@@ -84,6 +87,13 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
         </div>
       </div>
 
+      {/* Yojana Calendar & Deadline Urgency Alerts Banner for Saved Schemes */}
+      <YojanaCalendarBanner
+        schemes={schemes}
+        onOpenCalendar={() => setIsCalendarModalOpen(true)}
+        title="Saved Schemes Deadline Urgency Alerts"
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {schemes.map((scheme) => {
           const isTracked = trackedSchemeIds.includes(scheme.id) || trackedSchemeIds.includes(scheme.slug);
@@ -134,8 +144,23 @@ export const SavedSchemesManager: React.FC<SavedSchemesManagerProps> = ({
                   {scheme.shortDescription || (scheme as any)?.description || scheme.tagline}
                 </p>
 
-                <div className="pt-1">
+                <div className="pt-1 flex items-center justify-between gap-1.5 flex-wrap">
                   <DeadlineTicker scheme={scheme} variant="badge" />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const d = getSchemeDeadline(scheme);
+                      const url = getGoogleCalendarUrl(scheme, d);
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-emerald-950/50 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                    title="Sync this saved scheme with Google Calendar"
+                  >
+                    <Calendar className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>Sync Calendar</span>
+                  </button>
                 </div>
               </div>
 

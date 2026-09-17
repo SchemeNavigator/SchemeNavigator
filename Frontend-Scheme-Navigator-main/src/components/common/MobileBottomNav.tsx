@@ -66,22 +66,32 @@ export const MobileBottomNav: React.FC = () => {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 w-full max-w-full overflow-hidden bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800/90 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_25px_rgba(0,0,0,0.1)] transition-colors duration-200"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 w-full max-w-full overflow-visible bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800/90 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-4px_25px_rgba(0,0,0,0.1)] transition-colors duration-200 touch-manipulation"
     >
       <div className="grid grid-cols-5 items-center justify-around px-2 max-w-lg mx-auto">
         {navItems.map((item, idx) => {
           if (item.isCenterAction) {
+            const isSurveyActive =
+              location.pathname.startsWith('/survey') ||
+              location.pathname.startsWith('/analyzing');
+
             return (
               <button
                 key={idx}
                 type="button"
                 onClick={item.action}
-                className="flex flex-col items-center justify-center -mt-5 group cursor-pointer focus:outline-hidden active:scale-95 transition-transform"
+                className="flex flex-col items-center justify-center -mt-5 group cursor-pointer focus:outline-hidden active:scale-95 transition-transform w-full min-w-0 px-0.5 select-none relative z-10"
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-teal-700 via-teal-800 to-emerald-600 text-white flex items-center justify-center shadow-lg shadow-teal-950/30 ring-4 ring-white dark:ring-slate-950 transition-transform group-hover:scale-105">
-                  <Sparkles className="w-5.5 h-5.5 text-emerald-300 animate-pulse" />
+                <div
+                  className={`w-12 h-12 rounded-full bg-gradient-to-tr from-teal-600 via-teal-700 to-emerald-500 text-white flex items-center justify-center shadow-lg transition-all group-hover:scale-105 shrink-0 ring-4 ring-white dark:ring-slate-950 ${
+                    isSurveyActive
+                      ? 'shadow-teal-500/40 ring-offset-2 ring-offset-teal-600 dark:ring-offset-emerald-400'
+                      : 'shadow-teal-950/30 dark:shadow-emerald-950/60'
+                  }`}
+                >
+                  <Sparkles className="w-5.5 h-5.5 text-emerald-100 animate-pulse" />
                 </div>
-                <span className="text-[10px] font-black text-teal-800 dark:text-emerald-400 mt-0.5 tracking-tight">
+                <span className="text-[10px] font-black text-teal-800 dark:text-emerald-400 mt-1 tracking-tight w-full max-w-full text-center truncate px-0.5 block">
                   {item.label}
                 </span>
               </button>
@@ -98,7 +108,7 @@ export const MobileBottomNav: React.FC = () => {
             <NavLink
               key={idx}
               to={item.to!}
-              className={`flex flex-col items-center justify-center py-1 transition-all relative ${
+              className={`flex flex-col items-center justify-center py-1 min-h-[46px] transition-all relative w-full min-w-0 px-0.5 select-none active:scale-95 ${
                 isActive
                   ? 'text-teal-700 dark:text-emerald-400 font-bold'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
@@ -106,10 +116,10 @@ export const MobileBottomNav: React.FC = () => {
             >
               {/* Active Indicator Top Pill */}
               {isActive && (
-                <span className="absolute -top-1.5 w-6 h-1 bg-gradient-to-r from-teal-600 to-emerald-500 rounded-full" />
+                <span className="absolute top-0 w-6 h-0.5 bg-gradient-to-r from-teal-600 to-emerald-500 rounded-full" />
               )}
 
-              <div className="relative">
+              <div className="relative shrink-0">
                 <Icon
                   className={`w-5 h-5 transition-transform ${
                     isActive ? 'scale-110' : ''
@@ -129,7 +139,7 @@ export const MobileBottomNav: React.FC = () => {
                 )}
               </div>
 
-              <span className="text-[10px] font-bold mt-1 tracking-tight whitespace-nowrap">
+              <span className="text-[9px] sm:text-[10px] font-bold mt-1 tracking-tight w-full max-w-full text-center truncate px-0.5 block">
                 {item.label}
               </span>
             </NavLink>

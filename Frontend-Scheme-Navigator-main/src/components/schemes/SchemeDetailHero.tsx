@@ -14,6 +14,7 @@ import {
 import { isSchemeSaved } from '../../services/storageService';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getSafeOfficialUrl } from '../common/ExternalPortalModal';
+import { DeadlineTicker } from '../calendar/DeadlineTicker';
 
 interface SchemeDetailHeroProps {
   scheme: Scheme;
@@ -65,6 +66,7 @@ export const SchemeDetailHero: React.FC<SchemeDetailHeroProps> = ({
             <StatusPill type="category" value={scheme.category || 'General'} size="sm" />
             <StatusPill type="level" value={scheme.level || 'Central'} size="sm" />
             <StatusPill type="verified" value="" size="sm" />
+            <DeadlineTicker scheme={scheme} variant="badge" />
           </div>
 
           <div className="flex items-center gap-2">

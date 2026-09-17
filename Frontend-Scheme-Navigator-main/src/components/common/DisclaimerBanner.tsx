@@ -35,22 +35,26 @@ export const DisclaimerBanner: React.FC<DisclaimerBannerProps> = ({
     <>
       {/* Universal Top Notice Banner matching screenshot */}
       <div className={`w-full bg-slate-950 text-slate-300 py-2 px-3 sm:px-6 text-xs border-b border-slate-800/90 ${className}`}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="px-1.5 sm:px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0">
               NOTICE
             </span>
-            <span className="text-[11.5px] sm:text-xs text-slate-300 leading-snug truncate sm:whitespace-normal">
-              SchemeNavigator is an independent citizen discovery & guidance navigation layer. Final eligibility, approval, and disbursements are executed by respective Government Ministries.
+            <span className="text-[11px] sm:text-xs text-slate-300 leading-snug truncate sm:whitespace-normal">
+              <span className="sm:hidden">Independent citizen discovery platform</span>
+              <span className="hidden sm:inline">
+                SchemeNavigator is an independent citizen discovery & guidance navigation layer. Final eligibility, approval, and disbursements are executed by respective Government Ministries.
+              </span>
             </span>
           </div>
 
           <Link
             to="/about#what-we-are-not"
-            className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors whitespace-nowrap shrink-0 group"
+            className="inline-flex items-center gap-1 text-[10.5px] sm:text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors whitespace-nowrap shrink-0 group"
           >
-            <span>Read Full Mission & Transparency Notice</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            <span className="sm:hidden">Notice Details</span>
+            <span className="hidden sm:inline">Read Full Mission & Transparency Notice</span>
+            <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
       </div>

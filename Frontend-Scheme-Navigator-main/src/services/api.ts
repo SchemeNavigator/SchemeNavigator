@@ -11,8 +11,9 @@ const envUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
 let _backendUrl = envUrl || '';
 if (!isLocalhost && _backendUrl.includes('localhost')) {
   _backendUrl = '';
-} else if (isLocalhost && !_backendUrl) {
-  _backendUrl = 'http://localhost:8000';
+} else if (isLocalhost) {
+  const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
+  _backendUrl = `http://${host}:8000`;
 }
 
 export const API_BASE_URL = _backendUrl;

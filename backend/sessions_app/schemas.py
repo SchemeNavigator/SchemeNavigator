@@ -53,6 +53,46 @@ class UserProfileSchema(BaseModel):
     income_range: Optional[IncomeRange] = Field(None, alias="incomeRange")
     completed_at: Optional[str] = Field(None, alias="completedAt")
 
+    @field_validator("area_type", "residence_area", mode="before")
+    @classmethod
+    def coerce_area_type(cls, v):
+        if not v:
+            return ""
+        s = str(v).strip().lower()
+        if s == "urban":
+            return "Urban"
+        if s == "rural":
+            return "Rural"
+        if s in ["semi-urban", "semi_urban"]:
+            return "Semi-Urban"
+        if s == "all":
+            return "All"
+        return v
+
+    @field_validator("employment_type", mode="before")
+    @classmethod
+    def coerce_emp_type(cls, v):
+        if not v:
+            return ""
+        s = str(v).strip().lower()
+        mapping = {
+            "student": "Student",
+            "farmer": "Farmer",
+            "business owner": "Business owner",
+            "business_owner": "Business owner",
+            "business": "Business owner",
+            "employed": "Employed",
+            "unemployed": "Unemployed",
+            "self-employed": "Self-employed",
+            "self_employed": "Self-employed",
+            "homemaker": "Homemaker",
+            "retired": "Retired",
+            "other": "Other",
+            "government": "Government",
+            "private": "Private",
+        }
+        return mapping.get(s, v)
+
     @field_validator("age", mode="before")
     @classmethod
     def coerce_age(cls, v):

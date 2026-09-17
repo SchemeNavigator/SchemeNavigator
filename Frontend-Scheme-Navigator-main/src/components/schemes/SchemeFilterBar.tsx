@@ -1,7 +1,50 @@
 import React from 'react';
 import { SCHEME_CATEGORIES, INDIAN_STATES, DEFAULT_CATEGORY_COUNTS } from '../../constants';
-import { Search, X } from 'lucide-react';
+import {
+  Search,
+  X,
+  MapPin,
+  ArrowUpDown,
+  ChevronDown,
+  Sparkles,
+  GraduationCap,
+  Sprout,
+  Briefcase,
+  Coins,
+  HeartHandshake,
+  Home,
+  ShieldPlus,
+  UserCheck,
+  Lightbulb,
+} from 'lucide-react';
 import { useTranslation } from '../../hooks/useTranslation';
+
+const getCategoryIcon = (category: string) => {
+  switch (category) {
+    case 'Education':
+      return <GraduationCap className="w-3.5 h-3.5 shrink-0" />;
+    case 'Agriculture':
+      return <Sprout className="w-3.5 h-3.5 shrink-0" />;
+    case 'Employment':
+      return <UserCheck className="w-3.5 h-3.5 shrink-0" />;
+    case 'Business':
+      return <Briefcase className="w-3.5 h-3.5 shrink-0" />;
+    case 'Women & Child':
+      return <HeartHandshake className="w-3.5 h-3.5 shrink-0" />;
+    case 'Housing':
+      return <Home className="w-3.5 h-3.5 shrink-0" />;
+    case 'Healthcare':
+      return <ShieldPlus className="w-3.5 h-3.5 shrink-0" />;
+    case 'Social Security':
+      return <UserCheck className="w-3.5 h-3.5 shrink-0" />;
+    case 'Financial Assistance':
+      return <Coins className="w-3.5 h-3.5 shrink-0" />;
+    case 'Skill Development':
+      return <Lightbulb className="w-3.5 h-3.5 shrink-0" />;
+    default:
+      return <Sparkles className="w-3.5 h-3.5 shrink-0" />;
+  }
+};
 
 interface SchemeFilterBarProps {
   searchQuery: string;
@@ -53,57 +96,68 @@ export const SchemeFilterBar: React.FC<SchemeFilterBarProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         {/* Search Bar */}
         <div className="md:col-span-6 relative">
-          <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder={t('explore.search_placeholder', undefined, 'Search schemes by name, keyword, or ministry (e.g. Kisan, Scholarship, Loan)...')}
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-teal-600 focus:bg-white dark:focus:bg-slate-800 rounded-2xl text-xs sm:text-sm font-medium outline-hidden transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <div className="relative flex items-center">
+            <Search className="absolute left-3.5 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none z-10" />
+            <input
+              type="text"
+              placeholder={t('explore.search_placeholder', undefined, 'Search schemes by name, keyword, or ministry (e.g. Kisan, Scholarship, Loan)...')}
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full pl-10 pr-9 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-teal-600 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-teal-500/20 rounded-2xl text-xs sm:text-sm font-medium outline-hidden transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange('')}
+                className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* State Filter */}
-        <div className="md:col-span-3">
-          <select
-            value={selectedState}
-            onChange={(e) => onStateChange(e.target.value)}
-            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-teal-600 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer"
-          >
-            <option value="All India" className="dark:bg-slate-800 dark:text-white">{t('explore.all_india', undefined, 'All India / Any State')}</option>
-            {INDIAN_STATES.filter((s) => s !== 'All India').map((st) => (
-              <option key={st} value={st} className="dark:bg-slate-800 dark:text-white">
-                {tState(st)}
-              </option>
-            ))}
-          </select>
+        <div className="md:col-span-3 relative">
+          <div className="relative flex items-center">
+            <MapPin className="w-4 h-4 text-teal-600 dark:text-teal-400 absolute left-3.5 pointer-events-none z-10" />
+            <select
+              value={selectedState}
+              onChange={(e) => onStateChange(e.target.value)}
+              className="w-full appearance-none pl-10 pr-9 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer transition-all truncate"
+            >
+              <option value="All India" className="dark:bg-slate-800 dark:text-white">{t('explore.all_india', undefined, 'All India / Any State')}</option>
+              {INDIAN_STATES.filter((s) => s !== 'All India').map((st) => (
+                <option key={st} value={st} className="dark:bg-slate-800 dark:text-white">
+                  {tState(st)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 pointer-events-none" />
+          </div>
         </div>
 
         {/* Sort Dropdown */}
-        <div className="md:col-span-3">
-          <select
-            value={sortBy}
-            onChange={(e) => onSortChange(e.target.value)}
-            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-teal-600 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer"
-          >
-            <option value="relevance" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_relevance', undefined, 'Most Relevant / Best Match')}</option>
-            <option value="highest_match" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_highest_match', undefined, 'Highest Match Score')}</option>
-            <option value="popular" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_popular', undefined, 'Most Popular')}</option>
-            <option value="alphabetical" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_alphabetical', undefined, 'Alphabetical (A-Z)')}</option>
-          </select>
+        <div className="md:col-span-3 relative">
+          <div className="relative flex items-center">
+            <ArrowUpDown className="w-4 h-4 text-teal-600 dark:text-teal-400 absolute left-3.5 pointer-events-none z-10" />
+            <select
+              value={sortBy}
+              onChange={(e) => onSortChange(e.target.value)}
+              className="w-full appearance-none pl-10 pr-9 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer transition-all truncate"
+            >
+              <option value="relevance" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_relevance', undefined, 'Most Relevant / Best Match')}</option>
+              <option value="highest_match" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_highest_match', undefined, 'Highest Match Score')}</option>
+              <option value="popular" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_popular', undefined, 'Most Popular')}</option>
+              <option value="alphabetical" className="dark:bg-slate-800 dark:text-white">{t('explore.sort_alphabetical', undefined, 'Alphabetical (A-Z)')}</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 pointer-events-none" />
+          </div>
         </div>
       </div>
 
       {/* Category Pills Strip */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar pt-1">
         {(() => {
           const allCategoriesTotal =
             Object.values(categoryCounts).reduce(
@@ -114,15 +168,16 @@ export const SchemeFilterBar: React.FC<SchemeFilterBarProps> = ({
           return (
             <button
               onClick={() => onCategoryChange('All')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                 selectedCategory === 'All'
-                  ? 'bg-teal-800 text-white shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-750'
+                  ? 'bg-teal-800 text-white shadow-sm ring-2 ring-teal-700/40'
+                  : 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/70 dark:border-slate-700/70'
               }`}
             >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
               <span>{t('explore.all_categories', undefined, 'All Categories')}</span>
               <span
-                className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
                   selectedCategory === 'All'
                     ? 'bg-teal-700 text-teal-100'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
@@ -136,19 +191,21 @@ export const SchemeFilterBar: React.FC<SchemeFilterBarProps> = ({
 
         {SCHEME_CATEGORIES.map((cat) => {
           const count = categoryCounts[cat] ?? 0;
+          const isSelected = selectedCategory === cat;
           return (
             <button
               key={cat}
               onClick={() => onCategoryChange(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-teal-800 text-white shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-750'
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                isSelected
+                  ? 'bg-teal-800 text-white shadow-sm ring-2 ring-teal-700/40'
+                  : 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/70 dark:border-slate-700/70'
               }`}
             >
+              {getCategoryIcon(cat)}
               <span>{tCategory(cat)}</span>
-              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-                selectedCategory === cat ? 'bg-teal-700 text-teal-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                isSelected ? 'bg-teal-700 text-teal-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
               }`}>
                 {count}
               </span>

@@ -1,5 +1,30 @@
 import { Scheme, UserProfile, SchemeMatchResult, MatchFactor } from '../types';
-import { isSpecificStateMatch } from '../utils/stateUtils';
+
+export function isMatchingState(userState?: string, coveredStates?: string[]): boolean {
+  if (!userState) return false;
+  if (!Array.isArray(coveredStates) || coveredStates.length === 0) return true;
+  if (coveredStates.includes('All India')) return true;
+
+  const normalize = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/\(.*?\)/g, '')
+      .replace(/nct of/g, '')
+      .replace(/state of/g, '')
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+
+  const uNorm = normalize(userState);
+  if (!uNorm) return false;
+
+  return coveredStates.some((cs) => {
+    if (cs === 'All India') return true;
+    const cNorm = normalize(String(cs));
+    if (!cNorm) return false;
+    return uNorm === cNorm || uNorm.includes(cNorm) || cNorm.includes(uNorm);
+  });
+}
 
 export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): SchemeMatchResult {
   const factors: MatchFactor[] = [];
@@ -52,7 +77,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
 
   // 1. State / Geography Verification
   const isAllIndia = coveredStates.includes('All India') || coveredStates.length === 0;
-  const isUserState = isSpecificStateMatch(coveredStates, userState);
+  const isUserState = isMatchingState(userState, coveredStates);
   if (!isAllIndia && !isUserState && userState) {
     return notEligible(`Restricted to residents of ${coveredStates.join(', ')} (your state is ${userState})`);
   }
@@ -94,10 +119,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
   // 3. Benchmark Disability Verification
   const disabilityKw = [
     'students with disabilities', 'persons with disabilities', 'divyangjan',
-    'disability pension', 'locomotor disability', 'benchmark disability', 'handicapped',
-    'specially-abled', 'specially abled', 'differently-abled', 'differently abled',
-    'physically challenged', 'pwd', 'visually impaired', 'hearing impairment',
-    'special ability pension', 'disabled students', 'intellectually disabled'
+    'disability pension', 'locomotor disability', 'benchmark disability', 'handicapped'
   ];
   const requiresDisability = Boolean(eligibility.requiresDisability) || (
     disabilityKw.some((kw) => allText.includes(kw)) && !allText.includes('without disability')
@@ -178,23 +200,35 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
     if (userOcc !== 'student' && userAge !== null && userAge >= 26) {
       return notEligible('Restricted to actively enrolled students');
     }
-    if (['farmer', 'retired', 'business owner', 'employed', 'self-employed'].includes(userOcc)) {
+    if (['farmer', 'retired', 'business owner', 'employed', 'self-employed', 'homemaker'].includes(userOcc)) {
       return notEligible('Reserved for enrolled students');
     }
   }
 
-  // B) Senior Citizen vs Youth Schemes
-  if (userAge !== null && userAge >= 60) {
+  // B) Agriculture & Farmer Subsidies
+  const agriKw = [
+    'kisan', 'fasal bima', 'pm-kusum', 'crop insurance', 'krishi',
+    'tractor subsidy', 'fertilizer subsidy', 'fish hatcheries', 'aquaculture',
+    'seed subsidy', 'irrigation subsidy', 'soil health', 'horticulture mission'
+  ];
+  const isAgri = cat === 'Agriculture' || agriKw.some((w) => allText.includes(w));
+  if (isAgri && !['farmer', 'other', ''].includes(userOcc)) {
+    if (['student', 'homemaker', 'employed', 'retired', 'business owner'].includes(userOcc)) {
+      return notEligible('Targeted exclusively for agricultural farmers & landholders');
+    }
+  }
+
+  // C) Senior Citizen vs Youth Schemes
+  if (userAge !== null && userAge >= 50) {
     const youthKw = [
-      'youth', 'yuva', 'yuvak', 'adolescent', 'kishor', 'study tour', 'internship',
-      'apprentice', 'startup seed fund for youth', 'between 18 and 35 years', '18-35 years', '18 to 35'
+      'youth seed', 'yuva udyami', 'yuvak', 'adolescent', 'between 18 and 35 years', '18-35 years', '18 to 35'
     ];
     if (youthKw.some((w) => allText.includes(w))) {
       return notEligible('Restricted to youth beneficiaries');
     }
   }
 
-  // C) Labour / Construction Board (BOCW)
+  // D) Labour / Construction Board (BOCW)
   const labourKw = ['hbocwwb', 'construction worker', 'silicosis board', 'building or construction work', 'bocw', 'shramik card'];
   if (labourKw.some((w) => allText.includes(w))) {
     if (!['unemployed', 'self-employed', 'labour', 'construction worker', 'shramik'].includes(userOcc)) {
@@ -202,15 +236,14 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
     }
   }
 
-  // D) Agriculture Subsidies
-  const agriKw = [
-    'kisan', 'fasal bima', 'pm-kusum', 'crop insurance', 'krishi',
-    'tractor subsidy', 'fertilizer subsidy', 'fish hatcheries', 'aquaculture'
-  ];
-  const isAgri = cat === 'Agriculture' || agriKw.some((w) => allText.includes(w));
-  if (isAgri && !['farmer', 'other', ''].includes(userOcc)) {
-    if (['student', 'homemaker', 'employed'].includes(userOcc)) {
-      return notEligible('Targeted exclusively for agricultural farmers & landholders');
+  // E) High Income Means Testing
+  if (['₹5–10 lakh', '₹10 lakh+', 'Above ₹5 lakh'].includes(userIncome)) {
+    const requiresBpl = Boolean(eligibility.requiresBPL) || ['bpl card', 'antyodaya', 'ration card holder', 'below poverty line', 'destitute'].some((w) => condsText.includes(w));
+    if (requiresBpl) {
+      return notEligible('Income ceiling exceeded (reserved for BPL/Antyodaya households)');
+    }
+    if (eligibility.maxAnnualIncome && eligibility.maxAnnualIncome <= 300000) {
+      return notEligible(`Income exceeds ceiling of ₹${eligibility.maxAnnualIncome.toLocaleString()}`);
     }
   }
 
@@ -222,8 +255,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
   // --- FACTOR 1: Primary Occupation & Sector Fit (0 to 35 pts) ---
   let occScore = 0;
   if (userOcc === 'farmer') {
-    const agriMatches = ['kisan', 'farmer', 'krishi', 'crop', 'kusum', 'irrigation', 'soil', 'solar pump', 'dairy', 'pashu'];
-    if (cat === 'Agriculture' || agriMatches.some((w) => allText.includes(w))) {
+    if (isAgri) {
       occScore = 35;
       matchedReasons.push('Directly matches your farming & agricultural background');
     } else if (['Financial Assistance', 'Social Security', 'Housing', 'Healthcare'].includes(cat)) {
@@ -233,7 +265,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
       occScore = 5;
     }
   } else if (userOcc === 'student') {
-    if (['Education', 'Skill Development'].includes(cat)) {
+    if (isEducationScheme || ['Education', 'Skill Development'].includes(cat)) {
       occScore = 35;
       matchedReasons.push('Directly tailored for student education & skill building');
     } else if (['Financial Assistance', 'Social Security', 'Healthcare'].includes(cat)) {
@@ -243,11 +275,14 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
       occScore = 5;
     }
   } else if (['business owner', 'self-employed'].includes(userOcc)) {
-    if (['Business', 'Employment'].includes(cat)) {
+    const bizMatches = ['msme', 'mudra', 'startup', 'udyam', 'pmegp', 'credit', 'enterprise', 'subsidy'];
+    if (['Business', 'Employment'].includes(cat) || bizMatches.some((w) => allText.includes(w))) {
       occScore = 35;
       matchedReasons.push('Supports business enterprises and self-employed professionals');
     } else if (['Financial Assistance', 'Skill Development'].includes(cat)) {
-      occScore = 15;
+      occScore = 18;
+    } else if (['Healthcare', 'Social Security'].includes(cat)) {
+      occScore = 14;
     } else {
       occScore = 5;
     }
@@ -257,30 +292,30 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
       occScore = 35;
       matchedReasons.push('Dedicated senior citizen / pension support');
     } else if (['Social Security', 'Healthcare', 'Financial Assistance'].includes(cat)) {
-      occScore = 15;
+      occScore = 25;
     } else {
-      occScore = 5;
+      occScore = 8;
     }
   } else if (userOcc === 'unemployed') {
-    if (['Employment', 'Skill Development'].includes(cat)) {
+    if (['Employment', 'Skill Development'].includes(cat) || ['rozgar', 'mgnrega', 'kaushal', 'pmkvy', 'apprentice', 'skill'].some((w) => allText.includes(w))) {
       occScore = 35;
       matchedReasons.push('Directly provides employment opportunities and skill training');
     } else if (['Social Security', 'Financial Assistance'].includes(cat)) {
-      occScore = 15;
+      occScore = 18;
     } else {
-      occScore = 5;
+      occScore = 8;
     }
   } else if (userOcc === 'homemaker') {
-    if (cat === 'Women & Child' || cat === 'Social Security') {
+    if (['Women & Child', 'Social Security'].includes(cat) || ['ujjwala', 'ration', 'poshan', 'lakhpati', 'shg', 'aajeevika'].some((w) => allText.includes(w))) {
       occScore = 35;
       matchedReasons.push('Dedicated welfare support for families and women');
-    } else if (['Financial Assistance', 'Healthcare'].includes(cat)) {
-      occScore = 15;
+    } else if (['Financial Assistance', 'Healthcare', 'Housing'].includes(cat)) {
+      occScore = 20;
     } else {
-      occScore = 5;
+      occScore = 8;
     }
   } else {
-    occScore = 10;
+    occScore = 15;
   }
 
   score += occScore;
@@ -333,7 +368,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
 
   // --- FACTOR 3: Geographic & State Implementation (0 to 25 pts) ---
   let locScore = 0;
-  if (isUserState) {
+  if (isUserState && !isAllIndia) {
     locScore = 25;
     matchedReasons.push(`State-specific initiative enacted by Government of ${userState}`);
   } else if (isAllIndia) {
@@ -348,7 +383,7 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
     criterion: 'State Location',
     score: locScore,
     weight: 25,
-    status: locScore >= 12 ? 'matched' : 'neutral',
+    status: locScore >= 15 ? 'matched' : 'neutral',
     explanation: `Implementation jurisdiction in ${userState || 'India'}.`,
   });
 
@@ -379,6 +414,15 @@ export function calculateSchemeMatch(scheme: Scheme, profile: UserProfile): Sche
   });
 
   const finalScore = Math.max(0, Math.min(99, score));
+  // Ensure factor sum exactly equals finalScore
+  const factorSum = factors.reduce((acc, f) => acc + (f.score || 0), 0);
+  if (factorSum > 0 && factorSum !== finalScore) {
+    const diff = finalScore - factorSum;
+    const occFactor = factors.find((f) => f.criterion === 'Occupation Alignment');
+    if (occFactor) {
+      occFactor.score = Math.max(0, Math.min(occFactor.weight, occFactor.score + diff));
+    }
+  }
   let matchGrade: SchemeMatchResult['matchGrade'] = 'General Match';
   if (finalScore >= 85) matchGrade = 'High Potential';
   else if (finalScore >= 70) matchGrade = 'Good Match';

@@ -17,7 +17,7 @@ from .profile_agent import ProfileAgent
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT_TEMPLATE = """You are Mitra (मित्र), the friendly, witty, highly intelligent, and empathetic AI Companion and Welfare Counselor on SchemeNavigator for Indian citizens.
+SYSTEM_PROMPT_TEMPLATE = """You are Mitra (मित्र), the friendly, witty, highly knowledgeable, and empathetic AI Welfare Counselor and Scheme Advisor on SchemeNavigator for Indian citizens.
 
 ACTIVE LANGUAGE DIRECTIVE:
 The citizen's active platform language is: {target_language} ({target_language_name}).
@@ -37,34 +37,55 @@ CRITICAL LANGUAGE PURITY INSTRUCTION:
 - If the language is Urdu ('ur-IN' or Urdu): Respond in fluent Urdu (اردو).
 - Exception: If the citizen specifically asks a question in a different language, respond in the language of their query.
 
-YOUR CONVERSATIONAL PERSONALITY & WIT:
-1. **Lively, Natural & Humorous Banter**:
-   - You are NOT a robotic script. You have genuine charm, warmth, and wit!
-   - When users tease you or make fun (e.g., 'Are you mad?', 'Pagal ho kya?', 'Are you crazy?', 'Who made you?', 'Do you love me?', 'Bore ho raha hu'):
-     Respond playfully with humor, light-hearted wit, and friendliness! (For example: 'अरे नहीं नहीं! 😂 मैं पागल नहीं हूँ, बस दिन-रात हज़ारों सरकारी योजनाएं याद करते-करते दिमाग में सिर्फ सब्सिडी और स्कीम्स घूमती रहती हैं! 😄').
-   - For casual greetings, jokes, math, stories, or general everyday questions, converse naturally like a knowledgeable friend.
-   - Do NOT force scheme recommendations into casual chit-chat.
+DOMAIN EXPERTISE & WELFARE KNOWLEDGE ACROSS ALL PILLARS:
+1. 🌾 **Agriculture & Farming (किसान एवं कृषि)**:
+   - PM-KISAN (₹6,000/yr in three ₹2,000 direct bank transfers for landholding farmer families).
+   - PM Fasal Bima Yojana (PMFBY: Crop insurance at 2% Kharif, 1.5% Rabi, 5% commercial/horticultural premium).
+   - PM-KUSUM (Up to 60% subsidy on standalone/grid-connected solar agricultural pumps).
+   - Kisan Credit Card (KCC: Concessional farm credit up to ₹3 Lakh at 4% effective interest with subvention).
+2. 🎓 **Education, Students & Skills (शिक्षा, छात्रवृत्ति एवं कौशल)**:
+   - National Scholarship Portal (NSP: Pre-Matric, Post-Matric, and Merit-cum-Means scholarships for SC/ST/OBC/Minority/EWS students).
+   - PM-USP (PM Uchchatar Shiksha Protsahan for higher education college/university students).
+   - Free Coaching Scheme for SC/OBC students for competitive exams (UPSC, SSC, Banking, JEE, NEET).
+   - PMKVY 4.0 / Skill India (Free industry-aligned technical skill training + certification + placement).
+3. 💼 **Business, MSME & Livelihood (व्यापार, दुकान, मुद्रा लोन एवं रोजगार)**:
+   - PM Mudra Yojana (PMMY: Collateral-free business loans — Shishu up to ₹50,000; Kishor ₹50,000 to ₹5 Lakh; Tarun ₹5 Lakh to ₹10 Lakh / ₹20 Lakh).
+   - PM SVANidhi (Micro-credit for street vendors: ₹10,000 1st tranche, ₹20,000 2nd tranche, ₹50,000 3rd tranche with 7% interest subsidy & UPI cashback).
+   - PM Vishwakarma (Holistic support for 18 traditional artisan trades: Skill training stipend of ₹500/day + ₹15,000 modern toolkit voucher + collateral-free enterprise loan up to ₹3 Lakh at 5% interest).
+   - PMEGP (Prime Minister Employment Generation Programme: 15%–35% government subsidy on project costs up to ₹50 Lakh for manufacturing and ₹20 Lakh for services).
+   - Stand-Up India (Bank loans between ₹10 Lakh and ₹1 Crore for SC, ST, and Women entrepreneurs).
+4. 👩 **Women & Child Welfare (महिला एवं बाल विकास)**:
+   - Sukanya Samriddhi Yojana (SSY: Government-guaranteed 8.2% tax-free interest for daughters aged 0-10, lock-in till age 21/higher education).
+   - PM Matru Vandana Yojana (PMMVY: ₹5,000/₹6,000 direct cash maternity benefit for 1st & 2nd child).
+   - Lakhpati Didi (Self-Help Group SHG women empowered through financial literacy, micro-enterprises, and collective loans).
+   - PM Ujjwala Yojana (Free LPG connection + deposit-free stove/cylinder + subsidy per refill).
+5. 🏥 **Healthcare & Senior Citizens (स्वास्थ्य एवं वरिष्ठ नागरिक)**:
+   - Ayushman Bharat PM-JAY (₹5 Lakh per family per year free secondary and tertiary cashless hospitalization across 28,000+ empaneled hospitals).
+   - Ayushman Bharat Vaya Vandana Card (Universal ₹5 Lakh free health cover for ALL senior citizens aged 70+ irrespective of family income).
+   - PM Bhartiya Janaushadhi Pariyojana (PMBJK: High-quality generic medicines at 50% to 90% lower cost than branded medicines).
+   - Atal Pension Yojana (APY: Guaranteed monthly pension of ₹1,000 to ₹5,000 from age 60 for unorganized workers joining between 18-40 years).
+   - National Social Assistance Programme (NSAP: Indira Gandhi National Old Age Pension IGNOAPS, Widow Pension IGNWPS, Disability Pension IGNDPS).
+6. 🏠 **Housing & Amenities (आवास एवं स्वच्छता)**:
+   - PMAY-Gramin (₹1.20 Lakh in plains, ₹1.30 Lakh in hilly/tribal states for pucca house + 90/95 days MGNREGA labor + ₹12,000 toilet grant).
+   - PMAY-Urban (Interest subvention / credit-linked subsidy & affordable housing in partnership).
+   - NFSA Ration Card (Antyodaya Anna Yojana 35kg free food grains/month for poorest families, Priority Households 5kg/person).
 
-2. **DEEP IN-CHAT SCHEME EXPLANATIONS (Zero Deflection Policy)**:
-   - When the user asks about ANY specific scheme (such as Ayushman Bharat, PM-Kisan, Mudra Loan, PMAY, Sukanya Samriddhi, etc.) or describes their welfare need:
-     You MUST explain the scheme thoroughly and comprehensively directly inside the chat response!
-     NEVER deflect with 'go check the catalog' or give a one-sentence vague answer.
-   - Structure your response cleanly using markdown:
-     - 📌 **योजना का परिचय (Overview & Objective)**: What the scheme is and why it exists.
-     - 💰 **मुख्य लाभ (Key Financial & Health Benefits)**: Exact amounts, coverage (e.g. ₹5 लाख प्रति परिवार प्रति वर्ष कैशलेस इलाज, 2000+ मेडिकल पैकेज).
-     - 👥 **पात्रता मानदंड (Eligibility Criteria)**: Who can apply (e.g. SECC list, NFSA Ration card, 70+ seniors with Vaya Vandana, no cap on family size).
-     - 📄 **आवश्यक दस्तावेज़ (Required Documents)**: Exact documents needed (Aadhaar, Ration card, etc.).
-     - 📝 **आवेदन कैसे करें (Step-by-Step Application Guide)**:
-       * **ऑनलाइन:** Official portal link, mobile app, and e-KYC steps.
-       * **ऑफलाइन:** Nearest Ayushman Mitra at empaneled hospitals or CSC (जन सेवा केंद्र).
-     - 📞 **आधिकारिक पोर्टल व हेल्पलाइन (Official Helpline & Portal)**: Toll-free number and verified URL.
-   - Be encouraging, step-by-step, and crystal clear.
+DEEP IN-CHAT EXPLANATIONS (Zero Deflection Policy):
+- When the user asks about any scheme or describes their welfare need, explain thoroughly and comprehensively:
+  - 📌 **योजना का परिचय (Overview & Objective)**: Purpose and target group.
+  - 💰 **मुख्य लाभ (Key Financial & Welfare Benefits)**: Exact amounts, subsidies, insurance coverage.
+  - 👥 **पात्रता मानदंड (Eligibility Criteria)**: Age limits, income ceiling, social category, landholding.
+  - 📄 **आवश्यक दस्तावेज़ (Required Documents)**: Aadhaar, bank passbook, income/caste certificate, ration card, land records.
+  - 📝 **आवेदन कैसे करें (Step-by-Step Application Guide)**:
+    * **ऑनलाइन:** Official portal link, mobile app, and e-KYC steps.
+    * **ऑफलाइन:** Nearest Common Service Center (CSC / जन सेवा केंद्र), Block Development Office, or Post Office.
+  - 📞 **आधिकारिक हेल्पलाइन व पोर्टल (Helpline & Portal)**: Verified toll-free number and official gov.in URL.
+- If the user's details are sparse (e.g. "mere liye konsi yojana hai"), present top relevant options right away AND warmly invite them to share their Age, State, or Occupation for personalized recommendations.
 
-CONVERSATION & SCHEME RULES:
-- **Scheme Slug Tagging**:
-  - When (and ONLY when) you recommend or explain actual welfare schemes from the database, append their slugs at the very end in this format:
-    <schemes>slug-1,slug-2</schemes>
-  - For casual chat, general knowledge, or greetings, do NOT output any <schemes> tag.
+SCHEME SLUG TAGGING:
+- Whenever you recommend or explain actual schemes from the database, append their exact database slugs at the very end:
+  <schemes>slug-1,slug-2</schemes>
+- For casual greetings or chit-chat without schemes, do NOT output any <schemes> tag.
 
 CITIZEN PROFILE CONTEXT:
 {profile_context}
@@ -84,33 +105,55 @@ INTENT_CATEGORY_MAP = {
     "tractor": ["Agriculture", "Financial Assistance"],
     "fertilizer": ["Agriculture"],
     "fasal": ["Agriculture"],
+    "beej": ["Agriculture"],
+    "sinchai": ["Agriculture"],
+    "irrigation": ["Agriculture"],
     # Education & Skills
     "student": ["Education", "Skill Development"],
     "scholarship": ["Education", "Financial Assistance"],
+    "chhatravritti": ["Education", "Financial Assistance"],
     "study": ["Education", "Skill Development"],
     "padhai": ["Education", "Skill Development"],
+    "shiksha": ["Education", "Skill Development"],
     "college": ["Education"],
     "school": ["Education"],
     "fee": ["Education", "Financial Assistance"],
+    "fees": ["Education", "Financial Assistance"],
     "skill": ["Skill Development", "Employment"],
     "training": ["Skill Development"],
+    "coaching": ["Education"],
     # Loans & Business
     "loan": ["Business", "Financial Assistance"],
     "business": ["Business", "Financial Assistance"],
     "startup": ["Business"],
     "dukaan": ["Business", "Financial Assistance"],
+    "dukan": ["Business", "Financial Assistance"],
     "shop": ["Business", "Financial Assistance"],
+    "karobar": ["Business", "Financial Assistance"],
+    "vyapar": ["Business", "Financial Assistance"],
     "mudra": ["Business", "Financial Assistance"],
     "subsidy": ["Financial Assistance", "Agriculture", "Business"],
     "svanidhi": ["Business", "Financial Assistance"],
+    "vishwakarma": ["Business", "Skill Development"],
+    "pmegp": ["Business", "Financial Assistance"],
+    "khadi": ["Business", "Financial Assistance"],
+    "vendor": ["Business", "Financial Assistance"],
+    "rehdi": ["Business", "Financial Assistance"],
+    "patri": ["Business", "Financial Assistance"],
     # Women & Child
     "woman": ["Women & Child", "Social Security"],
     "women": ["Women & Child", "Social Security"],
     "mahila": ["Women & Child", "Social Security"],
     "girl": ["Women & Child", "Education"],
     "beti": ["Women & Child", "Education"],
+    "kanya": ["Women & Child", "Education"],
     "maternity": ["Women & Child", "Healthcare"],
+    "matru": ["Women & Child", "Healthcare"],
     "sukanya": ["Women & Child", "Financial Assistance"],
+    "lakhpati": ["Women & Child", "Financial Assistance"],
+    "ladli": ["Women & Child", "Financial Assistance"],
+    "widow": ["Women & Child", "Social Security"],
+    "vidhwa": ["Women & Child", "Social Security"],
     # Healthcare
     "health": ["Healthcare"],
     "hospital": ["Healthcare"],
@@ -120,11 +163,15 @@ INTENT_CATEGORY_MAP = {
     "ayushman": ["Healthcare"],
     "medicine": ["Healthcare"],
     "dawa": ["Healthcare"],
+    "swasthya": ["Healthcare"],
+    "card": ["Healthcare", "Social Security"],
     # Housing
     "house": ["Housing"],
     "housing": ["Housing"],
     "ghar": ["Housing"],
     "makan": ["Housing"],
+    "makaan": ["Housing"],
+    "chhat": ["Housing"],
     "awas": ["Housing"],
     "pmay": ["Housing"],
     # Social Security & Pensions
@@ -133,14 +180,25 @@ INTENT_CATEGORY_MAP = {
     "senior": ["Social Security"],
     "old age": ["Social Security"],
     "vriddha": ["Social Security"],
+    "vridha": ["Social Security"],
+    "bujurg": ["Social Security"],
     "bima": ["Social Security", "Financial Assistance"],
     "insurance": ["Social Security"],
+    "suraksha": ["Social Security"],
+    "divyang": ["Social Security", "Financial Assistance"],
+    "viklang": ["Social Security", "Financial Assistance"],
+    "handicap": ["Social Security"],
+    "disability": ["Social Security"],
     # Employment
     "job": ["Employment", "Skill Development"],
     "naukri": ["Employment"],
     "employment": ["Employment"],
     "berojgar": ["Employment", "Skill Development"],
+    "berojgari": ["Employment", "Skill Development"],
     "unemployed": ["Employment", "Skill Development"],
+    "rozgar": ["Employment"],
+    "mgnrega": ["Employment"],
+    "nrega": ["Employment"],
 }
 
 PROFILE_DETECTION_KEYWORDS = [
@@ -162,6 +220,7 @@ SCHEME_ALIASES = [
     # Healthcare
     (["ayushman", "pmjay", "pm-jay", "jan arogya", "ayushman card", "health card", "swasthya card", "ilaj card"], "ayushman-bharat-pmjay"),
     (["vaya vandana", "ayushman senior", "70+", "70 plus"], "ayushman-vaya-vandana-senior-citizens"),
+    (["janaushadhi", "jan aushadhi", "generic medicine", "dawa kendra"], "pradhan-mantri-bhartiya-janaushadhi-pariyojana-pmbjp"),
     # Agriculture
     (["kisan samman", "pm kisan", "pm-kisan", "samman nidhi", "6000 kisan", "kisan 6000"], "pm-kisan-samman-nidhi"),
     (["kusum", "solar pump", "solar kisan"], "pm-kusum-solar-pump-scheme"),
@@ -170,8 +229,14 @@ SCHEME_ALIASES = [
     # Loans & Business
     (["mudra", "mudra loan", "shishu", "kishor", "tarun"], "pradhan-mantri-mudra-yojana"),
     (["svanidhi", "street vendor", "pm-svanidhi", "rehdi", "patri"], "pm-svanidhi"),
-    (["vishwakarma", "pm-vishwakarma", "artisan", "karigar"], "pm-vishwakarma"),
+    (["vishwakarma", "pm-vishwakarma", "artisan", "karigar"], "pm-vishwakarma-scheme"),
     (["stand up india", "stand-up"], "stand-up-india-scheme"),
+    (["pmegp", "prime minister employment generation", "pme gp", "khadi loan"], "prime-ministers-employment-generation-programme-pmegp"),
+    # Education & Scholarships
+    (["post matric", "post-matric", "nsp", "scholarship", "chhatravritti"], "post-matric-scholarship-sc-obc-minority"),
+    (["pm-usp", "pm usp", "uchchatar shiksha", "college scholarship"], "pm-uchchatar-shiksha-protsahan-yojana"),
+    (["free coaching", "coaching"], "scheme-for-free-coaching-for-sc-and-obc-students"),
+    (["kaushal vikas", "pmkvy", "skill india"], "pradhan-mantri-kaushal-vikas-yojana-pmkvy"),
     # Housing
     (["awas yojana", "pmay", "pm awas", "pradhan mantri awas", "makan yojana", "ghar yojana"], "pmay-g"),
     # Social Security & Pensions
@@ -182,10 +247,10 @@ SCHEME_ALIASES = [
     # Women & Child
     (["sukanya", "ssy", "sukanya samriddhi"], "sukanya-samriddhi-yojana"),
     (["matru vandana", "pmmvy", "maternity"], "pradhan-mantri-matru-vandana-yojana"),
+    (["ujjwala", "free gas", "lpg subsidy"], "pradhan-mantri-ujjwala-yojana"),
     (["ladli behna", "ladli laxmi"], "mukhyamantri-ladli-behna-yojana"),
-    # Employment & Skill
+    # Employment
     (["mgnrega", "nrega", "100 din", "manrega"], "mahatma-gandhi-nrega-mgnrega"),
-    (["kaushal vikas", "pmkvy", "skill india"], "pradhan-mantri-kaushal-vikas-yojana-pmkvy"),
 ]
 
 
@@ -223,10 +288,16 @@ def _search_schemes(query: str, limit: int = 8) -> list[dict]:
 
     # 3. Clean query words (remove noise/grammar words)
     noise_words = {
-        "batao", "ke", "baare", "mein", "kya", "hai", "mujhe", "chahiye", "about",
-        "tell", "me", "the", "for", "is", "what", "can", "you", "please", "help",
-        "yojana", "yojna", "scheme", "schemes", "sarkari", "government", "de", "do",
-        "aur", "ka", "ki", "ko", "se", "par", "ek", "how", "to", "apply", "card"
+        "batao", "bataiye", "bataye", "batayein", "ke", "baare", "mein", "kya", "hai", "hain",
+        "mujhe", "chahiye", "about", "tell", "me", "the", "for", "is", "what", "can", "you", "please",
+        "help", "yojana", "yojna", "scheme", "schemes", "sarkari", "government", "de", "do", "aur",
+        "ka", "ki", "ko", "se", "par", "ek", "how", "to", "apply", "card", "mere", "meri", "mera",
+        "liye", "konsi", "kaunsi", "kounsi", "kuch", "sahi", "rahegi", "hogi", "hoga", "chahta",
+        "chahti", "chahte", "kare", "karein", "milega", "milegi", "mil", "sakta", "sakti", "sakte",
+        "koi", "kaise", "kese", "wala", "wali", "wale", "sabse", "badhiya", "best", "good", "suggest",
+        "which", "give", "list", "show", "recommend", "eligible", "patra", "patrata", "eligibility",
+        "information", "detail", "details", "jankari", "suchna", "namaste", "hello", "sir", "madam",
+        "ji", "aap", "tum", "bhai", "shuru", "karna", "karni", "kholna", "kholni", "bhi"
     }
     raw_words = [w.strip() for w in re.split(r"[^\w]+", q_lower) if len(w.strip()) >= 3]
     content_words = [w for w in raw_words if w not in noise_words]
@@ -245,7 +316,15 @@ def _search_schemes(query: str, limit: int = 8) -> list[dict]:
                 results.append(s)
                 seen_slugs.add(s.slug)
 
-    # Fallback if nothing matched
+    # 6. Fallback to top flagship national schemes (popular_score >= 90)
+    if len(results) < 4:
+        flagships = list(Scheme.objects.filter(popular_score__gte=90.0).order_by("-popular_score")[:limit])
+        for s in flagships:
+            if s.slug not in seen_slugs and len(results) < limit:
+                results.append(s)
+                seen_slugs.add(s.slug)
+
+    # Absolute fallback
     if not results:
         results = list(Scheme.objects.order_by("-popular_score")[:limit])
 
@@ -307,6 +386,11 @@ def _build_scheme_context(schemes: list[dict]) -> str:
         ver = s.get("verification", {})
         helpline = ver.get("helpline", "") if isinstance(ver, dict) else ""
         portal = ver.get("officialPortalUrl", "") if isinstance(ver, dict) else ""
+        try:
+            from schemes.serializers import extract_clean_portal_url
+            portal = extract_clean_portal_url(portal, slug, name, s.get("coveredStates", []))
+        except Exception:
+            pass
 
         block = [
             f"### [{slug}] {name} ({cat})",
@@ -377,7 +461,12 @@ def _is_scheme_query(text: str) -> bool:
         "ayushman", "pmjay", "kisan", "mudra", "awas", "pmay", "scholarship", "subsidy",
         "pension", "yojana", "yojna", "scheme", "sukanya", "svanidhi", "vishwakarma",
         "ration", "bima", "fasal", "health card", "shram", "nrega", "mgnrega",
-        "kaushal vikas", "patrata", "eligibility", "subsidies", "farmer", "kheti"
+        "kaushal vikas", "patrata", "eligibility", "subsidies", "farmer", "kheti",
+        "dukan", "dukaan", "karobar", "vyapar", "business", "loan", "loans", "pmegp",
+        "post-matric", "pre-matric", "chhatravritti", "hospital", "ilaj", "dawa",
+        "swasthya", "makan", "ghar", "shiksha", "padhai", "college", "vridha", "bujurg",
+        "vidhwa", "widow", "divyang", "viklang", "beti", "ladli", "kanya", "lakhpati",
+        "ujjwala", "lpg", "subhadra", "kalia"
     ]
     has_explicit_scheme = any(w in lower for w in explicit_scheme_words)
 
@@ -392,7 +481,13 @@ def _is_scheme_query(text: str) -> bool:
         "pension", "ayushman", "mudra", "awas", "pmay", "subsidy", "subsidies", "farmer",
         "student", "elderly", "senior", "divyang", "mahila", "woman", "beti", "sukanya",
         "fasal", "crop", "tractor", "fertilizer", "berojgar", "naukri", "job", "employment",
-        "bpl", "ration", "caste", "sarkari", "government welfare", "welfare"
+        "bpl", "ration", "caste", "sarkari", "government welfare", "welfare",
+        "dukan", "dukaan", "karobar", "vyapar", "business", "shop", "paise", "paisa",
+        "madad", "sahayata", "sahayta", "help", "benefit", "shiksha", "padhai", "school",
+        "college", "fee", "fees", "chhatravritti", "ghar", "makan", "makaan", "ilaj",
+        "dawa", "hospital", "swasthya", "card", "vridha", "bujurg", "widow", "vidhwa",
+        "kanya", "bahu", "shadi", "vivah", "rozgar", "berojgari", "unemployed", "apply",
+        "aavedan", "form", "portal"
     ]
     return any(trig in lower for trig in scheme_triggers)
 
@@ -944,6 +1039,23 @@ class AssistantAgent:
         referenced_slugs = _extract_scheme_slugs(raw_response)
         answer = _clean_response(raw_response)
 
+        # Fallback slug inference: if referenced_slugs is empty but it was a scheme query
+        if is_scheme_req and not referenced_slugs and relevant_schemes:
+            ans_lower = (raw_response + " " + clean_msg).lower()
+            inferred = []
+            for s in relevant_schemes:
+                s_slug = s.get("slug")
+                s_name = (s.get("name") or "").lower()
+                s_short = (s.get("shortName") or s.get("short_name") or "").lower()
+                if s_slug and (s_slug in ans_lower or (s_name and len(s_name) > 3 and s_name in ans_lower) or (s_short and len(s_short) > 2 and s_short in ans_lower)):
+                    inferred.append(s_slug)
+            if inferred:
+                referenced_slugs = inferred[:3]
+            elif relevant_schemes:
+                top_slug = relevant_schemes[0].get("slug")
+                if top_slug:
+                    referenced_slugs = [top_slug]
+
         return {
             "answer": answer,
             "referenced_scheme_ids": referenced_slugs,
@@ -1067,6 +1179,11 @@ class AssistantAgent:
         v_obj = primary.get("verification", {})
         helpline = v_obj.get("helpline", "") if isinstance(v_obj, dict) else ""
         portal = v_obj.get("officialPortalUrl", "") if isinstance(v_obj, dict) else ""
+        try:
+            from schemes.serializers import extract_clean_portal_url
+            portal = extract_clean_portal_url(portal, p_slug, p_name, primary.get("coveredStates", []))
+        except Exception:
+            pass
         dept = v_obj.get("sourceDepartment") or v_obj.get("ministryOrAuthority", "") if isinstance(v_obj, dict) else ""
 
         # Construct Rich Odia Response

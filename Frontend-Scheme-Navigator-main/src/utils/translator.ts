@@ -14,12 +14,9 @@ export const applySiteLanguage = (bcp47Code: string) => {
   const shortCode = getShortLangCode(bcp47Code);
   document.documentElement.lang = shortCode;
 
-  // Urdu is RTL, other Indian languages are LTR
-  if (shortCode === 'ur') {
-    document.documentElement.dir = 'rtl';
-  } else {
-    document.documentElement.dir = 'ltr';
-  }
+  // The entire web app shell is designed for LTR orientation.
+  // Lock document.documentElement.dir strictly to 'ltr' so language change never flips or distorts the UI.
+  document.documentElement.dir = 'ltr';
 
   try {
     localStorage.setItem('scheme_navigator_language', bcp47Code);

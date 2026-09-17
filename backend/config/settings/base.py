@@ -191,9 +191,7 @@ if any(dummy in _raw_key for dummy in ["your-key-here", "placeholder", "..."]):
     _raw_key = ""
 
 LITELLM_API_KEY = _raw_key
-LITELLM_API_BASE = os.environ.get("LITELLM_API_BASE", "").strip()
 LITELLM_MODEL = os.environ.get("LITELLM_MODEL", "gemini/gemini-2.5-flash").strip()
-LITELLM_TEMPERATURE = float(os.environ.get("LITELLM_TEMPERATURE", "0.4"))
 LITELLM_MAX_TOKENS = int(os.environ.get("LITELLM_MAX_TOKENS", "1200"))
 
 # ---------------------------------------------------------------------------

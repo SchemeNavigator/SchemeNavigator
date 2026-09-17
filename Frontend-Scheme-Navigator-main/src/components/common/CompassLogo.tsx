@@ -15,19 +15,19 @@ export const CompassLogo: React.FC<CompassLogoProps> = ({
   isAnimated = false,
 }) => {
   const iconDimensions = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
+    sm: 'w-7 h-7 sm:w-8 sm:h-8',
+    md: 'w-9 h-9 sm:w-10 sm:h-10',
     lg: 'w-12 h-12',
   };
 
   const textStyles = {
-    sm: 'text-base sm:text-lg',
-    md: 'text-lg sm:text-xl',
+    sm: 'text-[14.5px] sm:text-base lg:text-lg',
+    md: 'text-base sm:text-lg sm:text-xl',
     lg: 'text-2xl',
   };
 
   return (
-    <Link to="/" className={`inline-flex items-center gap-2.5 group ${className}`}>
+    <Link to="/" className={`inline-flex items-center gap-2 sm:gap-2.5 group ${className}`}>
       {/* Compass Icon Emblem */}
       <div className={`relative ${iconDimensions[size]} rounded-2xl bg-gradient-to-br from-teal-800 via-teal-900 to-slate-950 p-2 shadow-lg shadow-teal-950/20 border border-teal-500/40 flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-emerald-400/60 group-hover:shadow-emerald-900/30`}>
         {/* Ambient Ring Glow */}

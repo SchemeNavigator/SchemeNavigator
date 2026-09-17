@@ -126,6 +126,45 @@ export const SchemeCard: React.FC<SchemeCardProps> = ({ matchResult, onSaveChang
           </div>
         )}
 
+        {/* 0-Based Score Matching Tracking Ledger */}
+        {factors && factors.length > 0 && matchScore > 0 && (
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-slate-700 dark:text-slate-300 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                Score Tracked From 0
+              </span>
+              <span className="font-mono font-black text-emerald-700 dark:text-emerald-400 text-xs">
+                {matchScore} / 100 pts
+              </span>
+            </div>
+
+            {/* 4-Factor Breakdown Pills */}
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              {factors.slice(0, 4).map((f, idx) => (
+                <div
+                  key={idx}
+                  className="px-2 py-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between shadow-2xs"
+                  title={`${f.criterion}: ${f.explanation || ''}`}
+                >
+                  <span className="truncate pr-1 text-slate-600 dark:text-slate-400 font-medium">
+                    {f.criterion === 'Occupation Alignment'
+                      ? '💼 Occupation'
+                      : f.criterion === 'Age & Life Stage'
+                      ? '🎂 Age / Stage'
+                      : f.criterion === 'State Location'
+                      ? '📍 Location'
+                      : '💰 Economic'}
+                  </span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0 font-mono">
+                    +{f.score}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* "Why This Matches" Explainability Signals */}
         {matchedReasons && matchedReasons.length > 0 && !whyGood && (
           <div className="space-y-1.5 pt-1">

@@ -102,12 +102,12 @@ def _call_gemini_direct(
     import httpx
 
     clean_model = model_name.replace("gemini/", "").replace("models/", "").strip()
-    if clean_model in ("gemini-flash-latest", "gemini-flash", "flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite", ""):
-        clean_model = "gemini-3.5-flash"
-    
-    # Priority list of active models to try (robust against quota and deprecation)
-    models_to_try = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"]
-    if clean_model not in models_to_try:
+    if clean_model in ("gemini-flash", "flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.5-flash", "gemini-3.6-flash", ""):
+        clean_model = "gemini-flash-lite-latest"
+
+    # Priority list of active, verified Google AI Studio models (~1.7s latency)
+    models_to_try = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-flash-latest"]
+    if clean_model and clean_model not in models_to_try:
         models_to_try.insert(0, clean_model)
 
     # Format messages for Gemini API
@@ -164,7 +164,7 @@ def _call_gemini_direct(
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
                             return "".join(p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p)
-                elif resp.status_code in (404, 429):
+                elif resp.status_code in (404, 429, 503):
                     logger.info("Gemini model %s returned status %d, trying next available model...", try_model, resp.status_code)
                     last_error = f"Model {try_model} status {resp.status_code}: {resp.text[:120]}"
                     continue
@@ -189,7 +189,7 @@ def call_llm(
     Call the configured LLM via LiteLLM or direct Google Gemini API.
     Handles free-tier model routing and graceful retries.
     """
-    _model = model or getattr(settings, "LITELLM_MODEL", "gemini/gemini-3.5-flash")
+    _model = model or getattr(settings, "LITELLM_MODEL", "gemini/gemini-3.5-flash-lite")
     _temp = temperature if temperature is not None else getattr(settings, "LITELLM_TEMPERATURE", 0.4)
     _max_tokens = max_tokens if max_tokens is not None else getattr(settings, "LITELLM_MAX_TOKENS", 1024)
 
@@ -211,7 +211,7 @@ def call_llm(
         "messages": messages,
         "temperature": _temp,
         "max_tokens": _max_tokens,
-        "timeout": 6,
+        "timeout": 25.0,
     }
     if _api_key:
         kwargs["api_key"] = _api_key

@@ -14,6 +14,7 @@ import {
   convertOdiaNumbersToWords,
   transliterateOdiaToRoman,
   transliteratePunjabiToRoman,
+  splitIntoSpeechChunks,
 } from '../../hooks/useVoiceReader';
 import { translateSchemeContent } from '../../utils/schemeTranslator';
 import {
@@ -289,16 +290,29 @@ export const SchemeAdvisorChat: React.FC = () => {
   const isPunjabi = langCode.startsWith('pa');
   const activeSpeechLang = selectedLanguage?.speechCode || selectedLanguage?.code || langCode || (isOdia ? 'or-IN' : isPunjabi ? 'pa-IN' : isHindi ? 'hi-IN' : 'en-IN');
 
+  const incomingInitialQuery = ((location.state as any)?.initialQuery as string | undefined)?.trim();
+
   const [inputQuery, setInputQuery] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'msg-init-1',
-      sender: 'assistant',
-      text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
-      timestamp: 'Just now',
-    },
-  ]);
-  const [isTyping, setIsTyping] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const list: ChatMessage[] = [
+      {
+        id: 'msg-init-1',
+        sender: 'assistant',
+        text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
+        timestamp: 'Just now',
+      },
+    ];
+    if (incomingInitialQuery) {
+      list.push({
+        id: nextMsgId('msg-user'),
+        sender: 'user',
+        text: incomingInitialQuery,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+    return list;
+  });
+  const [isTyping, setIsTyping] = useState<boolean>(() => Boolean(incomingInitialQuery));
   // Auto-speak is OFF by default so user is never interrupted
   const [isAutoSpeak, setIsAutoSpeak] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
@@ -308,8 +322,18 @@ export const SchemeAdvisorChat: React.FC = () => {
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const initialSentRef = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const userProfile = getSavedProfile();
   const chatAudioRef = useRef<HTMLAudioElement | null>(null);
+  const chatChunksRef = useRef<string[]>([]);
+  const chatChunkIndexRef = useRef<number>(0);
+  const chatSpeakingMsgIdRef = useRef<string | null>(null);
+  const chatActiveUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const playChatChunkRef = useRef<(index: number, msgId: string, isFallbackRetry?: boolean) => void>(() => {});
 
   // Listen for speech synthesis voices loaded
   useEffect(() => {
@@ -325,46 +349,37 @@ export const SchemeAdvisorChat: React.FC = () => {
     }
   }, []);
 
-  // Sync initial message with language change if user hasn't chatted yet
+  // Chrome 15-second speech synthesis cutoff prevention heartbeat
   useEffect(() => {
-    if (messages.length === 1 && messages[0].id.startsWith('msg-init')) {
-      setMessages([
-        {
-          id: 'msg-init-1',
-          sender: 'assistant',
-          text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
-          timestamp: 'Just now',
-        },
-      ]);
-    }
-  }, [activeSpeechLang]);
+    if (!speakingMessageId || isSpeechPaused) return;
 
-  // Listen for speech synthesis voices loaded
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const updateVoices = () => {
-        window.speechSynthesis.getVoices();
-      };
-      updateVoices();
-      window.speechSynthesis.addEventListener('voiceschanged', updateVoices);
-      return () => {
-        window.speechSynthesis.removeEventListener('voiceschanged', updateVoices);
-      };
-    }
-  }, []);
+    const heartbeat = setInterval(() => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }
+    }, 8000);
+
+    return () => clearInterval(heartbeat);
+  }, [speakingMessageId, isSpeechPaused]);
 
   // Sync initial message with language change if user hasn't chatted yet
   useEffect(() => {
-    if (messages.length === 1 && messages[0].id.startsWith('msg-init')) {
-      setMessages([
-        {
-          id: 'msg-init-1',
-          sender: 'assistant',
-          text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
-          timestamp: 'Just now',
-        },
-      ]);
-    }
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].id.startsWith('msg-init')) {
+        return [
+          {
+            id: 'msg-init-1',
+            sender: 'assistant',
+            text: getLocalizedText(INITIAL_GREETINGS, activeSpeechLang),
+            timestamp: 'Just now',
+          },
+        ];
+      }
+      return prev;
+    });
   }, [activeSpeechLang]);
 
   // Voice Input (STT) Hook
@@ -394,6 +409,11 @@ export const SchemeAdvisorChat: React.FC = () => {
 
   // Voice Talk / TTS Controller
   const stopSpeech = useCallback(() => {
+    chatSpeakingMsgIdRef.current = null;
+    chatChunksRef.current = [];
+    chatChunkIndexRef.current = 0;
+    chatActiveUtteranceRef.current = null;
+
     if (chatAudioRef.current) {
       chatAudioRef.current.pause();
       chatAudioRef.current.src = '';
@@ -411,15 +431,14 @@ export const SchemeAdvisorChat: React.FC = () => {
   }, []);
 
   const pauseSpeech = useCallback(() => {
+    setIsSpeechPaused(true);
     if (chatAudioRef.current && !chatAudioRef.current.paused) {
       chatAudioRef.current.pause();
-      setIsSpeechPaused(true);
       return;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.pause();
-        setIsSpeechPaused(true);
       } catch (e) {
         console.warn('SpeechSynthesis pause error:', e);
       }
@@ -427,27 +446,28 @@ export const SchemeAdvisorChat: React.FC = () => {
   }, []);
 
   const resumeSpeech = useCallback(() => {
+    setIsSpeechPaused(false);
     if (chatAudioRef.current && chatAudioRef.current.paused) {
       chatAudioRef.current.play().catch(console.warn);
-      setIsSpeechPaused(false);
       return;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.resume();
-        setIsSpeechPaused(false);
       } catch (e) {
         console.warn('SpeechSynthesis resume error:', e);
       }
     }
   }, []);
 
-  const speakBrowserSpeech = useCallback(
-    (msgId: string, textToSpeak: string, isFallbackRetry: boolean = false) => {
+  const speakChatBrowserChunk = useCallback(
+    (index: number, msgId: string, isFallbackRetry: boolean = false) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      const chunks = chatChunksRef.current;
+      if (chatSpeakingMsgIdRef.current !== msgId || index >= chunks.length) return;
 
-      const cleaned = cleanTextForSpeech(textToSpeak);
-      if (!cleaned) return;
+      chatChunkIndexRef.current = index;
+      const text = chunks[index];
 
       // Resume if speech engine was paused
       if (window.speechSynthesis.paused) {
@@ -479,18 +499,18 @@ export const SchemeAdvisorChat: React.FC = () => {
 
         const langPrefix = activeSpeechLang.toLowerCase().split('-')[0];
         if (langPrefix === 'or') {
-          textToPronounce = transliterateOdiaToRoman(convertOdiaNumbersToWords(cleaned));
+          textToPronounce = transliterateOdiaToRoman(convertOdiaNumbersToWords(text));
           speechLang = 'en-IN';
         } else if (langPrefix === 'pa') {
-          textToPronounce = transliteratePunjabiToRoman(cleaned);
+          textToPronounce = transliteratePunjabiToRoman(text);
           speechLang = 'en-IN';
         } else {
-          textToPronounce = cleaned;
+          textToPronounce = text;
           speechLang = 'en-IN';
         }
       } else {
         matchedVoice = findBestVoice(voices, activeSpeechLang);
-        const prep = prepareSpeechUtterance(cleaned, activeSpeechLang, matchedVoice);
+        const prep = prepareSpeechUtterance(text, activeSpeechLang, matchedVoice);
         textToPronounce = prep.textToPronounce;
         speechLang = prep.speechLang;
       }
@@ -504,80 +524,140 @@ export const SchemeAdvisorChat: React.FC = () => {
         utterance.voice = matchedVoice;
       }
 
+      chatActiveUtteranceRef.current = utterance;
+
       utterance.onstart = () => {
         setSpeakingMessageId(msgId);
         setIsSpeechPaused(false);
       };
 
       utterance.onend = () => {
-        setSpeakingMessageId(null);
-        setIsSpeechPaused(false);
+        chatActiveUtteranceRef.current = null;
+        if (chatSpeakingMsgIdRef.current === msgId && chatChunkIndexRef.current === index) {
+          playChatChunkRef.current(index + 1, msgId, false);
+        }
       };
 
       utterance.onerror = (e: any) => {
+        chatActiveUtteranceRef.current = null;
         if (e?.error === 'canceled' || e?.error === 'interrupted') {
           return;
         }
-        console.warn('SpeechSynthesis error:', e);
-        if (!isFallbackRetry) {
-          speakBrowserSpeech(msgId, textToSpeak, true);
-          return;
+        console.warn('Chat SpeechSynthesis chunk error:', e);
+        if (chatSpeakingMsgIdRef.current === msgId && chatChunkIndexRef.current === index) {
+          if (!isFallbackRetry) {
+            speakChatBrowserChunk(index, msgId, true);
+            return;
+          }
+          playChatChunkRef.current(index + 1, msgId, false);
         }
-        setSpeakingMessageId(null);
-        setIsSpeechPaused(false);
       };
 
-      setTimeout(() => {
-        try {
-          window.speechSynthesis.speak(utterance);
-        } catch (e) {
-          console.warn('SpeechSynthesis speak error:', e);
-          if (!isFallbackRetry) {
-            speakBrowserSpeech(msgId, textToSpeak, true);
-          }
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn('SpeechSynthesis speak error:', e);
+        if (!isFallbackRetry && chatSpeakingMsgIdRef.current === msgId && chatChunkIndexRef.current === index) {
+          speakChatBrowserChunk(index, msgId, true);
         }
-      }, 30);
+      }
     },
     [activeSpeechLang, speechRate]
   );
 
-  const speakText = useCallback(
-    (msgId: string, textToSpeak: string, isFallbackRetry = false) => {
-      if (!isFallbackRetry) {
-        stopSpeech();
+  const playChatChunk = useCallback(
+    (index: number, msgId: string, isFallbackRetry: boolean = false) => {
+      const chunks = chatChunksRef.current;
+
+      if (chatSpeakingMsgIdRef.current !== msgId || index >= chunks.length) {
+        chatSpeakingMsgIdRef.current = null;
+        chatChunksRef.current = [];
+        chatChunkIndexRef.current = 0;
+        chatActiveUtteranceRef.current = null;
+        if (chatAudioRef.current) {
+          chatAudioRef.current.pause();
+          chatAudioRef.current = null;
+        }
+        setSpeakingMessageId(null);
+        setIsSpeechPaused(false);
+        return;
       }
 
-      const cleaned = cleanTextForSpeech(textToSpeak);
-      if (!cleaned) return;
+      chatChunkIndexRef.current = index;
+      const text = chunks[index];
+
+      // Stop previous audio
+      if (chatAudioRef.current) {
+        chatAudioRef.current.pause();
+        chatAudioRef.current.src = '';
+        chatAudioRef.current = null;
+      }
 
       // ── TIER 1: HIGH-FIDELITY NEURAL AUDIO (AUTHENTIC ODIA / INDIC ACCENT) ────
       if (!isFallbackRetry) {
         try {
-          const ttsUrl = `${API_BASE_URL}/api/assistant/tts/?text=${encodeURIComponent(cleaned)}&lang=${encodeURIComponent(activeSpeechLang)}&rate=${speechRate}`;
+          const ttsUrl = `${API_BASE_URL}/api/assistant/tts/?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(activeSpeechLang)}&rate=${speechRate}`;
           const audio = new Audio(ttsUrl);
           chatAudioRef.current = audio;
 
+          let fallbackTriggered = false;
+          let loadTimeout: any = null;
+
+          const triggerFallback = () => {
+            if (fallbackTriggered) return;
+            fallbackTriggered = true;
+            if (loadTimeout) clearTimeout(loadTimeout);
+            if (chatAudioRef.current === audio) {
+              audio.pause();
+              audio.src = '';
+              chatAudioRef.current = null;
+            }
+            if (chatSpeakingMsgIdRef.current === msgId && chatChunkIndexRef.current === index) {
+              speakChatBrowserChunk(index, msgId, false);
+            }
+          };
+
+          // 8-second safety timeout: give high-fidelity neural audio adequate time to buffer on fresh requests
+          loadTimeout = setTimeout(() => {
+            if (audio.paused && chatAudioRef.current === audio) {
+              console.warn(`Chat audio loading timed out for chunk ${index}, triggering instant browser fallback`);
+              triggerFallback();
+            }
+          }, 8000);
+
+          // Pre-fetch next chunk in background for gapless playback
+          if (index + 1 < chunks.length) {
+            const nextText = chunks[index + 1];
+            const nextUrl = `${API_BASE_URL}/api/assistant/tts/?text=${encodeURIComponent(nextText)}&lang=${encodeURIComponent(activeSpeechLang)}&rate=${speechRate}`;
+            const prefetch = new Audio();
+            prefetch.src = nextUrl;
+            prefetch.preload = 'auto';
+          }
+
           audio.onplay = () => {
+            if (loadTimeout) clearTimeout(loadTimeout);
             setSpeakingMessageId(msgId);
             setIsSpeechPaused(false);
           };
 
           audio.onended = () => {
-            setSpeakingMessageId(null);
-            setIsSpeechPaused(false);
+            if (loadTimeout) clearTimeout(loadTimeout);
             chatAudioRef.current = null;
+            if (chatSpeakingMsgIdRef.current === msgId && chatChunkIndexRef.current === index) {
+              playChatChunk(index + 1, msgId, false);
+            }
           };
 
           audio.onerror = (err) => {
-            console.warn('Chat neural TTS failed, falling back to browser speech synthesis:', err);
-            chatAudioRef.current = null;
-            speakBrowserSpeech(msgId, textToSpeak, false);
+            if (loadTimeout) clearTimeout(loadTimeout);
+            console.warn('Chat neural audio stream error, falling back to local speech synthesis for chunk', index, err);
+            triggerFallback();
           };
 
           audio.play().catch((playErr) => {
-            console.warn('Chat audio play blocked, falling back to browser speech synthesis:', playErr);
-            chatAudioRef.current = null;
-            speakBrowserSpeech(msgId, textToSpeak, false);
+            if (loadTimeout) clearTimeout(loadTimeout);
+            console.warn('Chat neural audio playback failed, falling back to speech synthesis:', playErr);
+            triggerFallback();
           });
           return;
         } catch (e) {
@@ -586,9 +666,34 @@ export const SchemeAdvisorChat: React.FC = () => {
       }
 
       // ── TIER 2: LOCAL BROWSER SPEECH SYNTHESIS FALLBACK ─────────────────────
-      speakBrowserSpeech(msgId, textToSpeak, isFallbackRetry);
+      speakChatBrowserChunk(index, msgId, isFallbackRetry);
     },
-    [activeSpeechLang, speechRate, stopSpeech, speakBrowserSpeech]
+    [activeSpeechLang, speechRate, speakChatBrowserChunk]
+  );
+
+  useEffect(() => {
+    playChatChunkRef.current = playChatChunk;
+  }, [playChatChunk]);
+
+  const speakText = useCallback(
+    (msgId: string, textToSpeak: string) => {
+      stopSpeech();
+
+      const cleaned = cleanTextForSpeech(textToSpeak);
+      if (!cleaned) return;
+
+      const chunks = splitIntoSpeechChunks(cleaned);
+      if (chunks.length === 0) return;
+
+      chatChunksRef.current = chunks;
+      chatChunkIndexRef.current = 0;
+      chatSpeakingMsgIdRef.current = msgId;
+      setSpeakingMessageId(msgId);
+      setIsSpeechPaused(false);
+
+      playChatChunk(0, msgId, false);
+    },
+    [stopSpeech, playChatChunk]
   );
 
   const handleCopyText = (msgId: string, text: string) => {
@@ -633,30 +738,20 @@ export const SchemeAdvisorChat: React.FC = () => {
     ]);
   };
 
-  const handleSend = async (queryText: string) => {
-    const q = (queryText || inputQuery).trim();
-    if (!q || isTyping) return;
+  const executeAIQuery = async (queryText: string) => {
+    const q = queryText.trim();
+    if (!q) return;
 
     if (isListening) {
       stopListening();
     }
     stopSpeech();
     resetTranscript();
-
-    const userMsg: ChatMessage = {
-      id: nextMsgId('msg-user'),
-      sender: 'user',
-      text: q,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInputQuery('');
     setIsTyping(true);
 
     try {
-      const history = newMessages.slice(-10).map((m) => ({
+      const currentList = messagesRef.current;
+      const history = currentList.slice(-10).map((m) => ({
         role: m.sender === 'user' ? 'user' : 'assistant',
         content: m.text,
       }));
@@ -708,12 +803,33 @@ export const SchemeAdvisorChat: React.FC = () => {
     }
   };
 
+  const handleSend = (queryText?: string) => {
+    const q = (queryText || inputQuery).trim();
+    if (!q || isTyping) return;
+
+    const userMsg: ChatMessage = {
+      id: nextMsgId('msg-user'),
+      sender: 'user',
+      text: q,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInputQuery('');
+    executeAIQuery(q);
+  };
+
   // Consume initialQuery from navigation state (e.g. from popup search)
   useEffect(() => {
     const initQuery = (location.state as any)?.initialQuery;
-    if (initQuery && !initialSentRef.current) {
+    if (initQuery && typeof initQuery === 'string' && initQuery.trim() && !initialSentRef.current) {
       initialSentRef.current = true;
-      handleSend(initQuery);
+      try {
+        window.history.replaceState({}, document.title);
+      } catch {
+        // ignore
+      }
+      executeAIQuery(initQuery.trim());
     }
   }, [location.state]);
 

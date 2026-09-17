@@ -211,8 +211,8 @@ export const translateSchemeContent = (scheme: Scheme, langCode: string = 'en-IN
     tagline: custom.tagline || custom.shortDescription || translateGlossaryPhrase(scheme.tagline || '', langCode),
     shortDescription: custom.shortDescription || custom.tagline || translateGlossaryPhrase(scheme.shortDescription || '', langCode),
     detailedDescription: custom.detailedDescription || custom.shortDescription || custom.tagline || scheme.detailedDescription,
-    category: translateGlossaryPhrase(scheme.category, langCode) as any,
-    level: translateGlossaryPhrase(scheme.level, langCode) as any,
+    category: scheme.category,
+    level: scheme.level,
     verification: scheme.verification ? {
       ...scheme.verification,
       ministryOrAuthority: translatedMinistry,

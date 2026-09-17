@@ -229,11 +229,11 @@ export const CompassVisual: React.FC = () => {
                     : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-lg hover:shadow-2xl'
                 } w-44 sm:w-52`}
               >
-                <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${card.badgeBg}`}>
+                <div className="flex items-center justify-between gap-1.5 mb-1.5 min-w-0">
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border truncate min-w-0 ${card.badgeBg}`}>
                     {card.badge}
                   </span>
-                  <span className="text-[9.5px] font-extrabold text-emerald-900 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-800 shadow-3xs">
+                  <span className="text-[9.5px] font-extrabold text-emerald-900 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-800 shadow-3xs shrink-0">
                     {card.match}
                   </span>
                 </div>

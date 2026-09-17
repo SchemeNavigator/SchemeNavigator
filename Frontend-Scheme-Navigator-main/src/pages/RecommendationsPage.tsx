@@ -6,8 +6,10 @@ import { SchemeFilterBar } from '../components/schemes/SchemeFilterBar';
 import { api } from '../services/api';
 import { Link } from 'react-router-dom';
 import { SchemeCategory, SchemeMatchResult } from '../types';
+import { isMatchingState } from '../services/matchingEngine';
 import { useTranslation } from '../hooks/useTranslation';
-import { isStateCovered } from '../utils/stateUtils';
+import { YojanaCalendarBanner } from '../components/calendar/YojanaCalendarBanner';
+import { YojanaCalendarModal } from '../components/calendar/YojanaCalendarModal';
 
 import {
   Edit3,
@@ -25,9 +27,7 @@ import {
   Users,
   ChevronDown,
   ArrowRight,
-  Calendar,
 } from 'lucide-react';
-import { YojanaCalendarModal } from '../components/calendar/YojanaCalendarModal';
 
 // ─── Occupation → Primary + secondary category priority map ──────────────────
 const OCCUPATION_CATEGORY_MAP: Record<string, { primary: SchemeCategory[]; secondary: SchemeCategory[] }> = {
@@ -223,8 +223,8 @@ export const RecommendationsPage: React.FC = () => {
   const [selectedState, setSelectedState] = useState(profile.state || 'All India');
   const [sortBy, setSortBy] = useState('relevance');
   const [minMatchScore, setMinMatchScore] = useState(0);
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [, setForceUpdate] = useState(0);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   useEffect(() => {
     setVisibleCount(20);
@@ -253,9 +253,7 @@ export const RecommendationsPage: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    if (apiResults.length === 0) {
-      setIsLoading(true);
-    }
+    setIsLoading(true);
     api.getRecommendations(profile).then((res) => {
       if (isMounted) {
         if (res && res.length > 0) {
@@ -292,7 +290,10 @@ export const RecommendationsPage: React.FC = () => {
 
       const matchesCat = selectedCategory === 'All' || s.category === selectedCategory;
 
-      const matchesState = isStateCovered(s.coveredStates, selectedState);
+      const matchesState =
+        selectedState === 'All India' ||
+        s.coveredStates.includes('All India') ||
+        isMatchingState(selectedState, s.coveredStates);
 
       const matchesScore = res.matchScore >= minMatchScore;
 
@@ -333,7 +334,10 @@ export const RecommendationsPage: React.FC = () => {
         s.verification?.ministryOrAuthority?.toLowerCase().includes(q) ||
         (Array.isArray(s.tags) && s.tags.some((t: string) => t.toLowerCase().includes(q)));
 
-      const matchesState = isStateCovered(s.coveredStates, selectedState);
+      const matchesState =
+        selectedState === 'All India' ||
+        s.coveredStates.includes('All India') ||
+        isMatchingState(selectedState, s.coveredStates);
 
       const matchesScore = res.matchScore >= minMatchScore;
 
@@ -401,35 +405,13 @@ export const RecommendationsPage: React.FC = () => {
         </div>
 
         {/* Yojana Calendar & Deadline Urgency Alerts Banner */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-teal-500/10 to-emerald-500/10 dark:from-amber-950/40 dark:via-teal-950/40 dark:to-emerald-950/40 border border-amber-300/80 dark:border-amber-700/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                  Yojana Calendar & Deadline Alerts
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
-                  Live Tickers
-                </span>
-              </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
-                Monitor approaching deadlines, scholarship cutoffs, and 1-Click .ics iCalendar synchronization for your recommended schemes.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsCalendarModalOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
-          >
-            <Calendar className="w-4 h-4 text-emerald-300" />
-            <span>Open Yojana Calendar</span>
-          </button>
-        </div>
+        {sortedResults.length > 0 && (
+          <YojanaCalendarBanner
+            schemes={sortedResults.map((r) => r.scheme)}
+            onOpenCalendar={() => setIsCalendarModalOpen(true)}
+            title="Yojana Application Calendar & Deadline Urgency Alerts"
+          />
+        )}
 
         {/* Filter Bar */}
         <SchemeFilterBar
@@ -466,31 +448,27 @@ export const RecommendationsPage: React.FC = () => {
             </span>
           </div>
 
-          {selectedCategory !== 'All' && (
-            <span className="text-teal-800 dark:text-teal-300">
-              {t('recommendations.filtered_by_cat', undefined, 'Filtered by Category:')} <strong>{tCategory(selectedCategory)}</strong>
-            </span>
-          )}
-        </div>
-
-        {/* Active Score Filter Alert Banner */}
-        {minMatchScore > 0 && (
-          <div className="p-3.5 rounded-2xl bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800/80 text-xs text-teal-950 dark:text-teal-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
-              <span>
-                Filtering schemes with match score <strong>≥ {minMatchScore}%</strong> ({sortedResults.length} schemes matching).
+          <div className="flex items-center gap-3">
+            {selectedCategory !== 'All' && (
+              <span className="text-teal-800 dark:text-teal-300">
+                {t('recommendations.filtered_by_cat', undefined, 'Filtered by Category:')} <strong>{tCategory(selectedCategory)}</strong>
               </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMinMatchScore(0)}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto shrink-0"
-            >
-              <span>Show All Schemes (Reset Score Filter)</span>
-            </button>
+            )}
+            {minMatchScore > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-300 text-xs">
+                <span>Min Match: ≥ {minMatchScore}%</span>
+                <button
+                  type="button"
+                  onClick={() => setMinMatchScore(0)}
+                  className="hover:text-rose-600 font-extrabold cursor-pointer ml-1"
+                  title="Show all match scores"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Schemes Results */}
         {isLoading ? (
@@ -534,18 +512,30 @@ export const RecommendationsPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Next 20 Schemes Pagination Button */}
+            {/* Next Schemes Pagination Button */}
             {visibleCount < sortedResults.length ? (
               <div className="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((prev) => prev + 20)}
-                  className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-gradient-to-r from-teal-700 via-teal-800 to-teal-950 hover:from-teal-800 hover:to-slate-900 text-white font-extrabold text-sm shadow-xl shadow-teal-950/20 hover:shadow-2xl transition-all cursor-pointer group active:scale-[0.98]"
-                >
-                  <Sparkles className="w-4 h-4 text-emerald-300 group-hover:rotate-12 transition-transform" />
-                  <span>Show Next {Math.min(20, sortedResults.length - visibleCount)} Eligible Schemes</span>
-                  <ArrowRight className="w-4 h-4 text-emerald-300 group-hover:translate-x-1 transition-transform" />
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((prev) => prev + 24)}
+                    className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-teal-700 via-teal-800 to-teal-950 hover:from-teal-800 hover:to-slate-900 text-white font-extrabold text-sm shadow-xl shadow-teal-950/20 hover:shadow-2xl transition-all cursor-pointer group active:scale-[0.98]"
+                  >
+                    <Sparkles className="w-4 h-4 text-emerald-300 group-hover:rotate-12 transition-transform" />
+                    <span>Show Next {Math.min(24, sortedResults.length - visibleCount)} Eligible Schemes</span>
+                    <ArrowRight className="w-4 h-4 text-emerald-300 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  {sortedResults.length > visibleCount && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(sortedResults.length)}
+                      className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
+                    >
+                      <span>Show All {sortedResults.length} Schemes</span>
+                    </button>
+                  )}
+                </div>
                 <span className="text-xs text-slate-500 font-medium">
                   Showing {Math.min(visibleCount, sortedResults.length)} of {sortedResults.length} eligible schemes found for your profile
                 </span>
@@ -598,14 +588,14 @@ export const RecommendationsPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Yojana Calendar Modal for Recommendations */}
-      <YojanaCalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-        schemes={matchResults.map((m) => m.scheme)}
-      />
+        {/* Yojana Calendar Modal */}
+        <YojanaCalendarModal
+          isOpen={isCalendarModalOpen}
+          onClose={() => setIsCalendarModalOpen(false)}
+          schemes={sortedResults.map((r) => r.scheme)}
+        />
+      </div>
     </div>
   );
 };

@@ -87,12 +87,14 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-haspopup="true"
-          title={`Current Language: ${selectedLanguage.nativeName}`}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-2xs transition-all cursor-pointer ${className}`}
+          title={`Current Language: ${selectedLanguage.nativeName} (${selectedLanguage.name})`}
+          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-2xs transition-all cursor-pointer shrink-0 min-w-0 max-w-[96px] sm:max-w-[120px] ${className}`}
         >
-          <Globe className="w-3.5 h-3.5 text-teal-700 dark:text-emerald-400" />
-          <span className="font-bold text-slate-900 dark:text-white">{selectedLanguage.nativeName}</span>
-          <ChevronDown className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <Globe className="w-3.5 h-3.5 text-teal-700 dark:text-emerald-400 shrink-0" />
+          <span className="font-bold text-slate-900 dark:text-white truncate text-[11px] sm:text-xs">
+            {selectedLanguage.nativeName}
+          </span>
+          <ChevronDown className={`w-3 h-3 text-slate-400 dark:text-slate-400 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
         </button>
       );
     }
@@ -142,15 +144,15 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         aria-expanded={isOpen}
         aria-haspopup="true"
         title="Change Language / भाषा बदलें"
-        className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-teal-300 dark:hover:border-teal-500/60 shadow-2xs hover:shadow-xs transition-all text-slate-800 dark:text-slate-100 cursor-pointer ${
+        className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 hover:border-teal-300 dark:hover:border-teal-500/60 shadow-2xs hover:shadow-xs transition-all text-slate-800 dark:text-slate-100 cursor-pointer shrink-0 min-w-0 ${
           isOpen ? 'ring-2 ring-teal-500/20 border-teal-500 bg-white dark:bg-slate-800 dark:border-teal-500/60' : ''
         } ${className}`}
       >
-        <div className="w-4 h-4 rounded-full bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-teal-900 dark:group-hover:bg-teal-600 transition-colors">
-          <Languages className="w-2.5 h-2.5 text-emerald-300" />
+        <div className="w-5 h-5 rounded-lg bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-teal-900 dark:group-hover:bg-teal-600 transition-colors">
+          <Languages className="w-3 h-3 text-emerald-300 shrink-0" />
         </div>
-        <div className="flex items-center">
-          <span className="font-extrabold text-slate-900 dark:text-white text-xs tracking-tight">
+        <div className="flex items-center min-w-0">
+          <span className="font-extrabold text-slate-900 dark:text-white text-xs tracking-tight truncate max-w-[90px] xl:max-w-none">
             {selectedLanguage.nativeName}
           </span>
         </div>
@@ -169,7 +171,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute z-50 mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 ${
+          className={`absolute z-50 mt-2 w-[calc(100vw-1.5rem)] max-w-xs sm:w-80 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200/90 dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150 ${
             align === 'right' ? 'right-0' : 'left-0'
           }`}
         >

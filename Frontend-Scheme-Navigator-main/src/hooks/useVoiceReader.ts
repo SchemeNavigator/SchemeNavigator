@@ -17,16 +17,19 @@ export function splitIntoSpeechChunks(text: string): string[] {
   const normalized = text.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!normalized) return [];
 
-  // Match sentences ending in ., !, ?, or Hindi danda (।)
-  const rawSentences = normalized.match(/[^.!?।]+[.!?।]+|[^.!?।]+$/g) || [normalized];
+  // Protect decimals (e.g. 1.5, 3.866) and currency abbreviations from splitting
+  const protectedText = normalized.replace(/(\d)\.(\d)/g, '$1__DOT__$2');
+
+  // Match sentences ending in ., !, ?, or Indic danda (।)
+  const rawSentences = protectedText.match(/[^.!?।\n]+[.!?।]+|[^.!?।\n]+$/g) || [protectedText];
   const chunks: string[] = [];
 
   for (const raw of rawSentences) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
+    const unmasked = raw.replace(/__DOT__/g, '.').trim();
+    if (!unmasked || unmasked.length < 2) continue;
 
-    if (trimmed.length > 150) {
-      const words = trimmed.split(' ');
+    if (unmasked.length > 150) {
+      const words = unmasked.split(' ');
       let current = '';
       for (const word of words) {
         if ((current + ' ' + word).trim().length > 140 && current.length > 0) {
@@ -40,7 +43,7 @@ export function splitIntoSpeechChunks(text: string): string[] {
         chunks.push(current.trim());
       }
     } else {
-      chunks.push(trimmed);
+      chunks.push(unmasked);
     }
   }
 
@@ -191,9 +194,39 @@ export function convertOdiaNumbersToWords(text: string): string {
  */
 export function transliterateOdiaToDevanagari(text: string): string {
   if (!text) return '';
+
+  // 1. Naturalize geminate retroflex nasal ଣ୍ଣ -> ଣ (e.g. ସମ୍ପୂର୍ଣ୍ଣ -> ସମ୍ପୂର୍ଣ -> सम्पूर्ण)
+  const s = text.replace(/ଣ୍ଣ/g, 'ଣ');
+
+  // 2. Preserve authentic Odia word-final vowels ('o' sound) on open-ended syllables:
+  // In Odia, words ending in -ର, -ଜ, -ବ, -ଭ, -ଳ, -ତ do NOT drop their vowels like Hindi!
+  const tokens = s.split(/(\s+|[.,!?।॥;:\(\)\[\]"'\-]+)/);
+  const outTokens: string[] = [];
+  for (let tok of tokens) {
+    if (!tok || /^\s+$|[.,!?।॥;:\(\)\[\]"'\-]+/.test(tok)) {
+      outTokens.push(tok);
+      continue;
+    }
+    if (tok.endsWith('ର')) {
+      tok = tok.slice(0, -1) + 'ରୋ';
+    } else if (tok.endsWith('ଜ') && tok.length > 1) {
+      tok = tok.slice(0, -1) + 'ଜୋ';
+    } else if (tok.endsWith('ବ') && tok.length > 1) {
+      tok = tok.slice(0, -1) + 'ବୋ';
+    } else if (tok.endsWith('ଭ') && tok.length > 1) {
+      tok = tok.slice(0, -1) + 'ଭୋ';
+    } else if (tok.endsWith('ଳ') && tok.length > 1) {
+      tok = tok.slice(0, -1) + 'ଳୋ';
+    } else if (tok.endsWith('ତ') && tok.length > 2) {
+      tok = tok.slice(0, -1) + 'ତୋ';
+    }
+    outTokens.push(tok);
+  }
+
+  const expanded = outTokens.join('');
   let res = '';
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
+  for (let i = 0; i < expanded.length; i++) {
+    const code = expanded.charCodeAt(i);
     if (code >= 0x0b66 && code <= 0x0b6f) {
       res += String(code - 0x0b66);
     } else if (code === 0x0b5c) {
@@ -203,21 +236,28 @@ export function transliterateOdiaToDevanagari(text: string): string {
     } else if (code === 0x0b5f) {
       res += '\u092f'; // ୟ -> य
     } else if (code === 0x0b2f) {
-      res += '\u091c'; // ଯ -> ज (Authentic Odia pronunciation of ଯ is J!)
+      // If preceded by virama (halant ୍), it is a ya-phala pronounced as 'य' (\u092f). Otherwise independent 'ज' (\u091c)
+      if (i > 0 && expanded.charCodeAt(i - 1) === 0x0b4d) {
+        res += '\u092f';
+      } else {
+        res += '\u091c';
+      }
     } else if (code === 0x0b71) {
       res += '\u0935'; // ୱ -> व
     } else if (code === 0x0b33) {
       res += '\u0932'; // ଳ (retroflex L) -> ल
-    } else if (code === 0x0b47 && i + 1 < text.length && text.charCodeAt(i + 1) === 0x0b3e) {
+    } else if (code === 0x0b38) {
+      res += '\u0938'; // ସ -> Dental स
+    } else if (code === 0x0b47 && i + 1 < expanded.length && expanded.charCodeAt(i + 1) === 0x0b3e) {
       res += '\u094b'; // େ + ା = ୋ (ो)
       i++;
-    } else if (code === 0x0b47 && i + 1 < text.length && text.charCodeAt(i + 1) === 0x0b57) {
+    } else if (code === 0x0b47 && i + 1 < expanded.length && expanded.charCodeAt(i + 1) === 0x0b57) {
       res += '\u094c'; // େ + ୗ = ୌ (ौ)
       i++;
     } else if (code >= 0x0b01 && code <= 0x0b75) {
       res += String.fromCharCode(code - 0x0200);
     } else {
-      res += text[i];
+      res += expanded[i];
     }
   }
   return res;
@@ -608,15 +648,11 @@ export function findBestVoice(voices: SpeechSynthesisVoice[], targetLang: string
     const localOdia = voices.find(isNativeOdiaVoice);
     if (localOdia) return localOdia;
 
-    // 2. Hindi voice (Google हिन्दी, Kalpana, Hemant, Swara, Madhur) - pronounces Devanagari phonetics
+    // 2. Hindi voice (Google हिन्दी, Kalpana, Hemant, Swara, Madhur) - pronounces Devanagari phonetics with accurate Odia diction
     const hindiVoice = voices.find(isHindiVoice);
     if (hindiVoice) return hindiVoice;
 
-    // 3. Bengali voice (Google বাংলা, Tanishaa, Bashkar) - sister Eastern Indic language
-    const bengaliVoice = voices.find(isBengaliVoice);
-    if (bengaliVoice) return bengaliVoice;
-
-    // 4. Indian English voice (Heera / Ravi / Neerja / Prabhat) - pronounces clean Romanized Odia phonetics
+    // 3. Indian English voice (Heera / Ravi / Neerja / Prabhat) - pronounces clean Romanized Odia phonetics
     const indianEnVoice = voices.find((v) => {
       const vl = v.lang.toLowerCase().replace('_', '-');
       const vn = v.name.toLowerCase();
@@ -626,6 +662,10 @@ export function findBestVoice(voices: SpeechSynthesisVoice[], targetLang: string
       );
     });
     if (indianEnVoice) return indianEnVoice;
+
+    // 4. Bengali voice (only as secondary sister-language fallback)
+    const bengaliVoice = voices.find(isBengaliVoice);
+    if (bengaliVoice) return bengaliVoice;
 
     // 5. Any English voice (David, Zira, etc.)
     const anyEn = voices.find((v) => v.lang.toLowerCase().startsWith('en'));
@@ -865,7 +905,7 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
 
       utterance.onend = () => {
         activeUtteranceRef.current = null;
-        if (isPlayingRef.current && !isPausedRef.current) {
+        if (isPlayingRef.current && !isPausedRef.current && indexRef.current === index) {
           speakChunk(index + 1, false);
         }
       };
@@ -877,7 +917,7 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
         }
         console.warn('SpeechSynthesis chunk error at index', index, err);
 
-        if (isPlayingRef.current) {
+        if (isPlayingRef.current && indexRef.current === index) {
           if (!isFallbackRetry) {
             speakBrowserSpeechSynthesis(index, true);
             return;
@@ -890,7 +930,7 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
         window.speechSynthesis.speak(utterance);
       } catch (e) {
         console.warn('speechSynthesis speak error:', e);
-        if (!isFallbackRetry && isPlayingRef.current) {
+        if (!isFallbackRetry && isPlayingRef.current && indexRef.current === index) {
           speakBrowserSpeechSynthesis(index, true);
         }
       }
@@ -942,6 +982,31 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
           const audio = new Audio(ttsUrl);
           audioRef.current = audio;
 
+          let fallbackTriggered = false;
+          let loadTimeout: any = null;
+
+          const triggerFallback = () => {
+            if (fallbackTriggered) return;
+            fallbackTriggered = true;
+            if (loadTimeout) clearTimeout(loadTimeout);
+            if (audioRef.current === audio) {
+              audio.pause();
+              audio.src = '';
+              audioRef.current = null;
+            }
+            if (isPlayingRef.current && indexRef.current === index) {
+              speakBrowserSpeechSynthesis(index, false);
+            }
+          };
+
+          // 8-second safety timeout: give high-fidelity neural audio adequate time to buffer on fresh requests
+          loadTimeout = setTimeout(() => {
+            if (audio.paused && audioRef.current === audio) {
+              console.warn(`Audio loading timed out for chunk ${index}, triggering instant browser fallback`);
+              triggerFallback();
+            }
+          }, 8000);
+
           // Pre-fetch next chunk in background for gapless playback
           if (index + 1 < chunks.length) {
             const nextText = chunks[index + 1];
@@ -951,27 +1016,28 @@ export const useVoiceReader = (options: UseVoiceReaderOptions = {}) => {
             prefetch.preload = 'auto';
           }
 
+          audio.onplay = () => {
+            if (loadTimeout) clearTimeout(loadTimeout);
+          };
+
           audio.onended = () => {
+            if (loadTimeout) clearTimeout(loadTimeout);
             audioRef.current = null;
-            if (isPlayingRef.current && !isPausedRef.current) {
+            if (isPlayingRef.current && !isPausedRef.current && indexRef.current === index) {
               speakChunk(index + 1, false);
             }
           };
 
           audio.onerror = (err) => {
+            if (loadTimeout) clearTimeout(loadTimeout);
             console.warn('Neural audio stream error, falling back to local speech synthesis for chunk', index, err);
-            audioRef.current = null;
-            if (isPlayingRef.current) {
-              speakBrowserSpeechSynthesis(index, false);
-            }
+            triggerFallback();
           };
 
           audio.play().catch((playErr) => {
+            if (loadTimeout) clearTimeout(loadTimeout);
             console.warn('Neural audio playback failed, falling back to speech synthesis:', playErr);
-            audioRef.current = null;
-            if (isPlayingRef.current) {
-              speakBrowserSpeechSynthesis(index, false);
-            }
+            triggerFallback();
           });
           return;
         } catch (e) {

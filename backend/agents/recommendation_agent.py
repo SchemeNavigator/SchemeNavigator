@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 SCHEME_CACHE_TTL = 60 * 10        # 10 minutes for full scheme list
 RECO_CACHE_TTL = 60 * 30          # 30 minutes for recommendation results
 
+_ALL_SCHEMES_CACHE: Optional[list[dict]] = None
+
 FEMALE_ONLY_KEYWORDS = [
     "mahila", "kanya", "sukanya", "widow", "maternity", "pregnant",
     "girl child", "kishori", "ladli", "women ", "female only", "matru vandana",
@@ -79,24 +81,27 @@ OCC_PRIMARY_CATEGORIES = {
 }
 
 
-def normalize_state(s: str) -> str:
-    if not s:
-        return ""
-    cleaned = re.sub(r'\(.*?\)', '', s).replace('&', 'and').lower()
-    return re.sub(r'[^a-z0-9]', '', cleaned).strip()
-
-
-def is_specific_state_match(covered_states: list, target_state: str) -> bool:
-    if not target_state or target_state == "All India":
+def _is_matching_state(user_state: str, covered_states: list) -> bool:
+    if not user_state:
         return False
-    norm_target = normalize_state(target_state)
-    if not norm_target:
+    if not covered_states or "All India" in covered_states:
+        return True
+
+    def normalize(name: str) -> str:
+        s = str(name).lower()
+        s = re.sub(r'\(.*?\)', '', s)
+        s = s.replace('nct of', '').replace('state of', '').replace('&', 'and')
+        return re.sub(r'[^a-z0-9]', '', s).strip()
+
+    u_norm = normalize(user_state)
+    if not u_norm:
         return False
-    for st in covered_states:
-        if st == "All India":
-            continue
-        norm_st = normalize_state(st)
-        if norm_st and (norm_st == norm_target or norm_target in norm_st or norm_st in norm_target):
+
+    for cs in covered_states:
+        if cs == "All India":
+            return True
+        c_norm = normalize(cs)
+        if c_norm and (u_norm == c_norm or u_norm in c_norm or c_norm in u_norm):
             return True
     return False
 
@@ -130,9 +135,10 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
     user_state = (profile.get("state") or "").strip()
     user_occ = str(profile.get("employmentType") or profile.get("occupation") or "").strip().lower()
     user_cat = (profile.get("category") or "General").strip()
-    user_income = profile.get("incomeRange") or ""
+    user_income = str(profile.get("incomeRange") or "").strip()
     user_disabled = bool(profile.get("isDisability") or profile.get("hasDisability"))
     user_bpl = bool(profile.get("hasBPLCard") or profile.get("isBPL") or user_income == "Below ₹1 lakh")
+    user_minority = bool(profile.get("isMinority") or user_cat == "Minority")
 
     # =========================================================================
     # STRICT STATUTORY INELIGIBILITY FILTERS (Score 0 on Violation)
@@ -140,11 +146,11 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
 
     # 1. State / Geography Verification
     is_all_india = "All India" in covered_states or len(covered_states) == 0
-    is_user_state = is_specific_state_match(covered_states, user_state)
+    is_user_state = _is_matching_state(user_state, covered_states)
     if not is_all_india and not is_user_state and user_state:
         return 0, "Not Eligible", [], [f"Restricted to residents of {', '.join(covered_states)} (your state is {user_state})"], []
 
-    # 2. Gender Verification
+    # 2. Gender & Marital Status Verification
     allowed_genders = [g.lower() for g in elig.get("allowedGenders", [])]
     if allowed_genders and "all" not in allowed_genders and user_gender:
         if user_gender not in allowed_genders:
@@ -153,7 +159,7 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
     female_kw = [
         "mahila", "kanya", "sukanya", "widow", "maternity", "pregnant",
         "girl child", "kishori", "ladli", "women only", "female only", "matru vandana",
-        "laxmi", "bhagyashree", "prasooti", "stree", "didi", "beti", "balika", "nari"
+        "laxmi", "bhagyashree", "prasooti", "stree", "didi", "beti", "balika", "nari", "lakhpati didi"
     ]
     if user_gender == "male":
         if cat == "Women & Child":
@@ -161,7 +167,7 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
         if any(kw in all_text for kw in female_kw) or "widow" in all_text:
             if not any(w in all_text for w in ["both boys and girls", "all genders", "boys and girls", "children of", "widower"]):
                 return 0, "Not Eligible", [], ["Targeted specifically for female beneficiaries"], []
-        if any(kw in conds_text for kw in ["applicant should be a female", "girl child", "widow", "pregnant woman", "lactating mother"]):
+        if any(kw in conds_text for kw in ["applicant should be a female", "girl child", "widow", "pregnant woman", "lactating mother", "female only"]):
             return 0, "Not Eligible", [], ["Targeted specifically for female beneficiaries"], []
 
     if user_gender == "female":
@@ -169,16 +175,13 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
             return 0, "Not Eligible", [], ["Targeted specifically for male beneficiaries"], []
 
     # 3. Benchmark Disability Verification
-    disability_kw = [
+    disability_terms = [
         "students with disabilities", "persons with disabilities", "divyangjan",
         "disability pension", "locomotor disability", "benchmark disability", "handicapped",
-        "specially-abled", "specially abled", "differently-abled", "differently abled",
-        "physically challenged", "pwd", "visually impaired", "hearing impairment",
-        "special ability pension", "disabled students", "intellectually disabled"
+        "visually impaired", "hearing impaired", "pwd quota"
     ]
     requires_disability = bool(elig.get("requiresDisability")) or (
-        any(kw in all_text for kw in disability_kw)
-        and "without disability" not in all_text
+        any(kw in all_text for kw in disability_terms) and "without disability" not in all_text
     )
     if requires_disability and not user_disabled:
         return 0, "Not Eligible", [], ["Requires benchmark disability certificate (40%+ Divyangjan)"], []
@@ -190,19 +193,19 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
             if not (user_cat in ["SC", "ST"] and any(c in ["SC", "ST"] for c in allowed_cats)):
                 return 0, "Not Eligible", [], [f"Reserved exclusively for {', '.join(allowed_cats)} categories"], []
 
-    user_minority = bool(profile.get("isMinority"))
+    minority_pattern = r'\b(for\s+minority|for\s+minorities|minority\s+students|minority\s+community|minority\s+scheme|begum\s+hazrat\s+mahal|maulana\s+azad)\b'
     requires_minority = bool(elig.get("requiresMinority")) or (
-        re.search(r'\b(for\s+minority|for\s+minorities|minority\s+students|minority\s+community|minority\s+scheme)\b', all_text)
-        and not any(w in all_text for w in ["non-minority", "all communities"])
+        bool(re.search(minority_pattern, all_text)) and not any(w in all_text for w in ["non-minority", "all communities", "open to all"])
     )
     if requires_minority and not user_minority:
         return 0, "Not Eligible", [], ["Reserved for students from notified minority communities"], []
 
     if user_cat == "General":
-        if re.search(r'\b(for\s+sc\b|for\s+st\b|for\s+obc\b|for\s+ebc\b|for\s+dnt\b|scheduled\s+caste|scheduled\s+tribe|backward\s+classes|obc\s+students|sc\s+students|st\s+students|obc\s+candidates|minority\s+community|for\s+minority|for\s+minorities)\b', all_text):
+        affirmative_pattern = r'\b(for\s+sc\b|for\s+st\b|for\s+obc\b|for\s+ebc\b|for\s+dnt\b|scheduled\s+caste|scheduled\s+tribe|backward\s+classes|obc\s+students|sc\s+students|st\s+students|obc\s+candidates|minority\s+community|for\s+minority|for\s+minorities)\b'
+        if re.search(affirmative_pattern, all_text):
             if not any(w in all_text for w in ["general", "all categories", "open to all"]):
                 return 0, "Not Eligible", [], ["Reserved for affirmative action categories (SC/ST/OBC/Minority)"], []
-        if any(re.search(r'\b(scheduled\s+caste|sc\s+category|scheduled\s+tribe|st\s+category|backward\s+class|obc\s+category|minority\s+community|for\s+minority)\b', c) for c in custom_conds):
+        if any(re.search(affirmative_pattern, c) for c in custom_conds):
             if not any(w in conds_text for w in ["general", "all categories", "open to all"]):
                 return 0, "Not Eligible", [], ["Reserved for affirmative action categories (SC/ST/OBC/Minority)"], []
 
@@ -216,14 +219,19 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
             return 0, "Not Eligible", [], [f"Maximum eligible age is {max_age} years (your age: {user_age})"], []
 
         # Senior citizen pensions (60+)
-        if any(term in all_text for term in ["senior citizen pension", "old age pension", "vridha pension", "vridhavastha", "vaya vandana", "70+ years", "age of 60 years or above", "aged 60 years and above"]):
+        if any(term in all_text for term in ["senior citizen pension", "old age pension", "vridha pension", "vridhavastha", "vaya vandana", "70+ years", "age of 60 years or above", "aged 60 years and above", "ignaps"]):
             if user_age < 60:
                 return 0, "Not Eligible", [], [f"Reserved for Senior Citizens aged 60+ (your age: {user_age})"], []
 
-        # Minor school child schemes
+        # Minor school child schemes (<18)
         if re.search(r'\b(class\s*(?:1|1st|i)\s*to\s*(?:8|8th|10|10th|12|12th)|classes\s*1\s*to\s*12|pre-matric|school\s*children|primary\s*school|girl\s*child\s*under\s*10|school\s*uniforms)\b', all_text):
             if user_age >= 18:
                 return 0, "Not Eligible", [], ["Restricted to school-going children (Class 1st to 12th)"], []
+
+        # Youth schemes (18-35)
+        if user_age >= 50 or user_occ == "retired":
+            if any(w in all_text for w in ["youth seed", "yuva udyami", "yuvak", "adolescent", "between 18 and 35 years", "18-35 years", "18 to 35"]):
+                return 0, "Not Eligible", [], ["Restricted to youth beneficiaries"], []
 
     # 6. DOMAIN & OCCUPATIONAL STATUTORY EXCLUSIONS
     # A) Education & Student Schemes
@@ -232,52 +240,63 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
         or any(w in all_text for w in ["scholarship", "fellowship", "school student", "college student", "aicte", "post-matric", "pre-matric", "tuition fee", "b.tech", "ug/pg", "higher education", "study tour", "degree college"])
     )
     if is_education_scheme:
-        # Non-students of adult age cannot get student scholarships
         if user_occ != "student" and (user_age is not None and user_age >= 26):
             return 0, "Not Eligible", [], ["Restricted to actively enrolled students"], []
-        if user_occ in ["farmer", "retired", "business owner", "employed", "self-employed"]:
+        if user_occ in ["farmer", "retired", "business owner", "employed", "self-employed", "homemaker"]:
             return 0, "Not Eligible", [], ["Reserved for enrolled students"], []
 
-    # B) Senior Citizen vs Youth Schemes
-    if user_age is not None and user_age >= 60:
-        if any(w in all_text for w in ["youth", "yuva", "yuvak", "adolescent", "kishor", "study tour", "internship", "apprentice", "startup seed fund for youth", "between 18 and 35 years", "18-35 years", "18 to 35"]):
-            return 0, "Not Eligible", [], ["Restricted to youth beneficiaries"], []
+    # B) Agriculture & Farmer Subsidies
+    is_agri = (
+        cat == "Agriculture"
+        or any(w in all_text for w in ["kisan", "fasal bima", "pm-kusum", "crop insurance", "krishi", "tractor subsidy", "fertilizer subsidy", "fish hatcheries", "aquaculture", "seed subsidy", "irrigation subsidy", "soil health", "horticulture mission"])
+    )
+    if is_agri and user_occ not in ["farmer", "other"]:
+        if user_occ in ["student", "homemaker", "employed", "retired", "business owner"]:
+            return 0, "Not Eligible", [], ["Targeted exclusively for agricultural farmers & landholders"], []
 
     # C) Labour / Construction Board (BOCW)
     if any(w in all_text for w in ["hbocwwb", "construction worker", "silicosis board", "building or construction work", "bocw", "shramik card"]):
         if user_occ not in ["unemployed", "self-employed", "labour", "construction worker", "shramik"]:
             return 0, "Not Eligible", [], ["Requires active registration with Construction Labour Board (BOCW)"], []
 
-    # D) Agriculture Subsidies
-    is_agri = (
-        cat == "Agriculture"
-        or any(w in all_text for w in ["kisan", "fasal bima", "pm-kusum", "crop insurance", "krishi", "tractor subsidy", "fertilizer subsidy", "fish hatcheries", "aquaculture"])
-    )
-    if is_agri and user_occ not in ["farmer", "other"]:
-        if user_occ in ["student", "homemaker", "employed"]:
-            return 0, "Not Eligible", [], ["Targeted exclusively for agricultural farmers & landholders"], []
+    # D) High Income Means Testing
+    if user_income in ["₹5–10 lakh", "₹10 lakh+", "Above ₹5 lakh"]:
+        requires_bpl = bool(elig.get("requiresBPL")) or any(
+            w in conds_text for w in ["bpl card", "antyodaya", "ration card holder", "below poverty line", "destitute"]
+        )
+        if requires_bpl:
+            return 0, "Not Eligible", [], ["Income ceiling exceeded (reserved for BPL/Antyodaya households)"], []
+        max_income = elig.get("maxAnnualIncome")
+        if max_income and isinstance(max_income, (int, float)) and max_income <= 300000:
+            return 0, "Not Eligible", [], [f"Income exceeds ceiling of ₹{int(max_income):,}"], []
 
     # =========================================================================
-    # TRUE ZERO-BASED SCORE TRACKING (Starting at 0, Points Earned on True Fit)
+    # REFINED ZERO-BASED SCORE TRACKING (Starting at 0, Points Earned on Fit)
     # =========================================================================
     score = 0
     factors = []
     matched_reasons = []
     unmatched_warnings = []
 
+    senior_kw = ["senior", "pension", "vridha", "elderly", "old age", "vaya vandana", "vayoshri", "geriatric", "ignaps"]
+    is_senior_scheme = any(w in all_text for w in senior_kw)
+
     # --- FACTOR 1: Primary Occupation & Sector Fit (0 to 35 pts) ---
     occ_score = 0
     if user_occ == "farmer":
-        if cat == "Agriculture" or any(w in all_text for w in ["kisan", "farmer", "krishi", "crop", "kusum", "irrigation", "soil", "solar pump", "dairy", "pashu"]):
+        if is_agri:
             occ_score = 35
             matched_reasons.append("Directly matches your farming & agricultural background")
-        elif cat in ["Financial Assistance", "Social Security", "Housing", "Healthcare"]:
-            occ_score = 15
+        elif user_age is not None and user_age >= 60 and is_senior_scheme:
+            occ_score = 35
+            matched_reasons.append("Dedicated senior citizen welfare & support")
+        elif cat in ["Healthcare", "Social Security", "Financial Assistance", "Housing"]:
+            occ_score = 20 if (user_age is not None and user_age >= 60) else 15
             matched_reasons.append("General public welfare initiative available to rural households")
         else:
             occ_score = 5
     elif user_occ == "student":
-        if cat in ["Education", "Skill Development"]:
+        if is_education_scheme or cat in ["Education", "Skill Development"]:
             occ_score = 35
             matched_reasons.append("Directly tailored for student education & skill building")
         elif cat in ["Financial Assistance", "Social Security", "Healthcare"]:
@@ -286,57 +305,95 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
         else:
             occ_score = 5
     elif user_occ in ["business owner", "self-employed"]:
-        if cat in ["Business", "Employment"]:
+        if cat in ["Business", "Employment"] or any(w in all_text for w in ["msme", "mudra", "startup", "udyam", "pmegp", "credit", "enterprise", "subsidy"]):
             occ_score = 35
             matched_reasons.append("Supports business enterprises and self-employed professionals")
         elif cat in ["Financial Assistance", "Skill Development"]:
-            occ_score = 15
+            occ_score = 18
+        elif cat in ["Healthcare", "Social Security"]:
+            occ_score = 14
         else:
             occ_score = 5
     elif user_occ == "retired" or (user_age is not None and user_age >= 60):
-        if any(w in all_text for w in ["pension", "old age", "senior citizen", "vridha", "elderly", "ignaps"]):
+        if is_senior_scheme:
             occ_score = 35
             matched_reasons.append("Dedicated senior citizen / pension support")
         elif cat in ["Social Security", "Healthcare", "Financial Assistance"]:
-            occ_score = 15
+            occ_score = 25
         else:
-            occ_score = 5
+            occ_score = 8
+    elif user_occ == "homemaker":
+        if cat in ["Women & Child", "Social Security"] or any(w in all_text for w in ["ujjwala", "ration", "poshan", "lakhpati", "shg", "aajeevika"]):
+            occ_score = 35
+            matched_reasons.append("Dedicated welfare support for women and families")
+        elif cat in ["Healthcare", "Financial Assistance", "Housing"]:
+            occ_score = 20
+        else:
+            occ_score = 8
+    elif user_occ == "unemployed":
+        if cat in ["Employment", "Skill Development"] or any(w in all_text for w in ["rozgar", "mgnrega", "kaushal", "pmkvy", "apprentice", "skill", "job"]):
+            occ_score = 35
+            matched_reasons.append("Directly provides employment opportunities and skill training")
+        elif cat in ["Financial Assistance", "Social Security"]:
+            occ_score = 18
+        else:
+            occ_score = 8
     else:
-        occ_score = 10
+        occ_score = 15
 
     score += occ_score
-    factors.append({"criterion": "Occupation Alignment", "score": occ_score, "weight": 35, "status": "matched" if occ_score >= 15 else "neutral", "explanation": f"Domain fit based on {profile.get('employmentType') or 'occupation'}."})
+    factors.append({
+        "criterion": "Occupation Alignment",
+        "score": occ_score,
+        "weight": 35,
+        "status": "matched" if occ_score >= 18 else "neutral",
+        "explanation": f"Domain fit based on {profile.get('employmentType') or profile.get('occupation') or 'general background'}."
+    })
 
     # --- FACTOR 2: Age Bracket & Life Stage Alignment (0 to 25 pts) ---
     age_score = 0
     if user_age is not None and user_age >= 60:
-        if any(w in all_text for w in ["pension", "old age", "senior citizen", "vridha", "elderly", "ignaps", "geriatric", "vaya vandana"]):
+        if is_senior_scheme:
             age_score = 25
             matched_reasons.append(f"Specifically designed for Senior Citizens aged {user_age}+")
+        elif is_agri and user_occ == "farmer":
+            age_score = 22
+            matched_reasons.append("Eligible adult farmer with full life-stage qualification")
         elif cat in ["Healthcare", "Social Security"]:
-            age_score = 15
+            age_score = 20
+            matched_reasons.append("Healthcare & social security benefit for senior citizens")
         else:
-            age_score = 8
+            age_score = 12
     elif user_age is not None and 18 <= user_age <= 25:
         if any(w in all_text for w in ["youth", "yuva", "student", "scholarship", "higher education", "undergraduate", "b.tech"]):
             age_score = 25
             matched_reasons.append(f"Prime eligibility for youth / students aged {user_age}")
         elif cat in ["Education", "Skill Development"]:
-            age_score = 18
+            age_score = 22
         else:
-            age_score = 8
+            age_score = 14
     else:
-        if min_age is not None and max_age is not None and user_age is not None and min_age <= user_age <= max_age:
+        if is_agri and user_occ == "farmer":
+            age_score = 22
+        elif (user_occ in ["business owner", "self-employed"] and cat in ["Business", "Employment"]):
+            age_score = 22
+        elif min_age is not None and max_age is not None and user_age is not None and min_age <= user_age <= max_age:
             age_score = 20
         else:
-            age_score = 10
+            age_score = 16
 
     score += age_score
-    factors.append({"criterion": "Age & Life Stage", "score": age_score, "weight": 25, "status": "matched" if age_score >= 15 else "neutral", "explanation": f"Life stage evaluated for age {user_age or 'specified'}."})
+    factors.append({
+        "criterion": "Age & Life Stage",
+        "score": age_score,
+        "weight": 25,
+        "status": "matched" if age_score >= 18 else "neutral",
+        "explanation": f"Life stage evaluated for age {user_age or 'specified'}."
+    })
 
     # --- FACTOR 3: Geographic & State Implementation (0 to 25 pts) ---
     loc_score = 0
-    if is_user_state:
+    if is_user_state and not is_all_india:
         loc_score = 25
         matched_reasons.append(f"State-specific initiative enacted by Government of {user_state}")
     elif is_all_india:
@@ -346,24 +403,38 @@ def _precision_score(scheme: dict, profile: dict) -> tuple[int, str, list[str], 
         loc_score = 5
 
     score += loc_score
-    factors.append({"criterion": "State Location", "score": loc_score, "weight": 25, "status": "matched" if loc_score >= 12 else "neutral", "explanation": f"Implementation jurisdiction in {user_state or 'India'}."})
+    factors.append({
+        "criterion": "State Location",
+        "score": loc_score,
+        "weight": 25,
+        "status": "matched" if loc_score >= 18 else "neutral",
+        "explanation": f"Implementation jurisdiction in {user_state or 'India'}."
+    })
 
     # --- FACTOR 4: Socio-Economic & Income Fit (0 to 15 pts) ---
     econ_score = 0
     if user_bpl:
-        if any(w in all_text for w in ["bpl", "antyodaya", "ration", "low income", "poor", "free"]):
-            econ_score = 15
-            matched_reasons.append("Income bracket fully satisfies financial assistance norms")
+        econ_score = 15
+        matched_reasons.append("Income bracket fully satisfies financial assistance norms")
+    elif user_income in ["Below ₹1 lakh", "₹1–2.5 lakh", "below_1l", "100000-250000"]:
+        if is_agri or is_senior_scheme or cat in ["Healthcare", "Social Security", "Housing"]:
+            econ_score = 14
+            matched_reasons.append("Income bracket fully satisfies targeted welfare criteria")
         else:
-            econ_score = 10
-    elif user_income in ["Below ₹1 lakh", "₹1–2.5 lakh"]:
-        econ_score = 12
-        matched_reasons.append("Income within eligible bracket for targeted public support")
+            econ_score = 12
+    elif user_income in ["₹2.5–5 lakh", "250000-500000"]:
+        econ_score = 10
     else:
-        econ_score = 8
+        econ_score = 7
 
     score += econ_score
-    factors.append({"criterion": "Economic Need", "score": econ_score, "weight": 15, "status": "matched" if econ_score >= 10 else "neutral", "explanation": f"Income evaluated for {user_income or 'general'} bracket."})
+    factors.append({
+        "criterion": "Economic Need",
+        "score": econ_score,
+        "weight": 15,
+        "status": "matched" if econ_score >= 10 else "neutral",
+        "explanation": f"Income evaluated for {user_income or 'general'} bracket."
+    })
 
     final_score = max(0, min(99, score))
     if final_score >= 85:
@@ -392,7 +463,7 @@ class RecommendationAgent:
         profile_hash = hashlib.md5(
             json.dumps(profile, sort_keys=True, ensure_ascii=False).encode()
         ).hexdigest()
-        cache_key = f"recommendations:v5:{profile_hash}"
+        cache_key = f"recommendations:v8:{profile_hash}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached if top_n is None else cached[:top_n]
@@ -402,10 +473,11 @@ class RecommendationAgent:
             return []
 
         # Step 1: Precision Pre-Score all schemes against statutory criteria
+        # Returns all schemes matching with score >= 40 (statutory eligible)
         scored_candidates = []
         for s in schemes:
             score, grade, reasons, warnings, factors = _precision_score(s, profile)
-            if score >= 45:
+            if score >= 40:
                 scored_candidates.append({
                     "scheme": s,
                     "matchScore": score,
@@ -417,13 +489,13 @@ class RecommendationAgent:
 
         # Sort candidate pool: highest match score first, official verified schemes on top
         scored_candidates.sort(
-            key=lambda r: (r["matchScore"], float(r["scheme"].get("popularScore", 0) or 0)),
+            key=lambda r: (r["matchScore"], float(r["scheme"].get("popular_score") or r["scheme"].get("popularScore") or 0)),
             reverse=True,
         )
 
-        candidate_pool = scored_candidates[:16]
+        candidate_pool = scored_candidates[:12]
         if not candidate_pool:
-            candidate_pool = scored_candidates[:10]
+            candidate_pool = scored_candidates[:8]
 
         # Step 2: Ask Google Gemini AI to analyze profile & select Top recommendations
         ai_results = self._gemini_analyze_and_rank(profile, candidate_pool, top_n=12)
@@ -440,7 +512,7 @@ class RecommendationAgent:
             c for c in scored_candidates
             if c["scheme"].get("slug") not in used_slugs
         ]
-        
+
         # Add smart fallback insights to remaining candidates
         remaining_with_insights = self._generate_smart_fallback(profile, remaining_candidates, top_n=len(remaining_candidates))
 
@@ -548,6 +620,17 @@ Return a JSON object with this exact structure:
                     else:
                         grade_val = "General Match"
 
+                    # Calibrate factors so sum(f['score']) exactly matches clamped_score
+                    base_factors = [dict(f) for f in base.get("factors", [])]
+                    if base_factors:
+                        base_sum = sum(f["score"] for f in base_factors)
+                        if base_sum > 0 and base_sum != clamped_score:
+                            diff = clamped_score - base_sum
+                            for f in base_factors:
+                                if f.get("criterion") == "Occupation Alignment":
+                                    f["score"] = max(5, min(f.get("weight", 35), f["score"] + diff))
+                                    break
+
                     enriched.append({
                         "scheme": base["scheme"],
                         "matchScore": clamped_score,
@@ -556,10 +639,10 @@ Return a JSON object with this exact structure:
                         "toNote": item.get("toNote") or (base["unmatchedWarnings"][0] if base["unmatchedWarnings"] else "Verify details on official portal."),
                         "matchedReasons": item.get("matchedReasons") or base["matchedReasons"],
                         "unmatchedWarnings": base["unmatchedWarnings"],
-                        "factors": base["factors"],
+                        "factors": base_factors if base_factors else base.get("factors", []),
                     })
 
-            if len(enriched) >= 5:
+            if len(enriched) >= 3:
                 return enriched
 
         except Exception as exc:
@@ -605,11 +688,16 @@ Return a JSON object with this exact structure:
     @staticmethod
     def _get_all_schemes() -> list[dict]:
         """
-        Fetch all schemes from the database, cached for 10 minutes.
+        Fetch all schemes from the database, cached in-process and in Django cache.
         """
-        cache_key = "recommendations:all_schemes_v2"
+        global _ALL_SCHEMES_CACHE
+        if _ALL_SCHEMES_CACHE is not None:
+            return _ALL_SCHEMES_CACHE
+
+        cache_key = "recommendations:all_schemes_v3"
         cached = cache.get(cache_key)
         if cached is not None:
+            _ALL_SCHEMES_CACHE = cached
             return cached
 
         from schemes.models import Scheme
@@ -619,4 +707,6 @@ Return a JSON object with this exact structure:
         data = SchemeSerializer(qs, many=True).data
         schemes = [dict(s) for s in data]
         cache.set(cache_key, schemes, SCHEME_CACHE_TTL)
+        _ALL_SCHEMES_CACHE = schemes
         return schemes
+

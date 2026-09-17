@@ -21,11 +21,13 @@ export const ChatbotFAB: React.FC = () => {
     const query = searchQuery.trim();
     if (!query) return;
     setIsOpen(false);
+    setSearchQuery('');
     navigate('/assistant', { state: { initialQuery: query } });
   };
 
   const handleQuickPromptClick = (prompt: string) => {
     setIsOpen(false);
+    setSearchQuery('');
     navigate('/assistant', { state: { initialQuery: prompt } });
   };
 
@@ -33,7 +35,7 @@ export const ChatbotFAB: React.FC = () => {
     <div className="hidden md:flex fixed bottom-6 right-6 z-50 flex-col items-end gap-3">
       {/* Pop-out card panel */}
       {isOpen && (
-        <div className="w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-3xl border border-teal-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 z-50">
+        <div className="w-[calc(100vw-2.5rem)] sm:w-96 bg-white dark:bg-slate-900 rounded-3xl border border-teal-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 z-50 max-h-[85vh] overflow-y-auto">
           {/* Card header */}
           <div className="bg-gradient-to-r from-teal-800 via-teal-900 to-slate-950 px-5 py-4 flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
@@ -137,8 +139,10 @@ export const ChatbotFAB: React.FC = () => {
             <button
               type="button"
               onClick={() => {
+                const q = searchQuery.trim();
                 setIsOpen(false);
-                navigate('/assistant');
+                setSearchQuery('');
+                navigate('/assistant', { state: q ? { initialQuery: q } : undefined });
               }}
               className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-teal-700 to-teal-950 hover:from-teal-800 hover:to-slate-900 text-white text-xs font-extrabold rounded-2xl shadow-lg shadow-teal-950/20 hover:shadow-xl transition-all cursor-pointer"
             >

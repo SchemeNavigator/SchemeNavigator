@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ExternalLink, ShieldCheck, AlertTriangle, X, CheckSquare } from 'lucide-react';
 import { Scheme } from '../../types';
 import { useTranslation } from '../../hooks/useTranslation';
+import { DeadlineTicker } from '../calendar/DeadlineTicker';
 
 interface ExternalPortalModalProps {
   scheme: Scheme | null;
@@ -112,15 +113,104 @@ const MINISTRY_DIRECT_PORTALS: Record<string, string> = {
   'rural': 'https://rural.nic.in',
 };
 
+const URL_REGEX = /https?:\/\/[^\s'"<>]+/g;
+
+export function extractCleanPortalUrl(rawUrl: string | undefined | null): string {
+  if (!rawUrl) return '';
+  let cleaned = rawUrl
+    .replace(/chrome-extension:\/\/[a-z0-9]+\/https?:\/\//g, 'https://')
+    .replace(/chrome-extensionhttps?:\/\//g, 'https://');
+
+  const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('file:///'));
+  if (lines.length === 0) return '';
+
+  const candidates: { score: number; url: string }[] = [];
+
+  const priorityKeywords: [string[], number][] = [
+    [['official website', 'official portal', 'portal', 'website', 'online application', 'apply', 'registration', 'apply online', 'portal login'], 120],
+    [['sanman portal', 'sso', 'edistrict', 'service', 'dbt', 'mahaonline', 'e-services'], 100],
+    [['application form', 'application status', 'scheme details', 'detail', 'details', 'about'], 80],
+    [['guidelines', 'guideline', 'notification', 'circular', 'order', 'amendment', 'press release'], 50],
+    [['user manual', 'faq', 'contact'], 30],
+  ];
+
+  for (const line of lines) {
+    const matches = line.match(URL_REGEX) || [];
+    for (let u of matches) {
+      u = u.replace(/[.,;)\]#'"]+$/, '');
+      if (!u.startsWith('http')) continue;
+
+      // Handle google redirects
+      if (u.includes('google.co.in/url?') || u.includes('google.com/url?')) {
+        try {
+          const parsed = new URL(u);
+          const target = parsed.searchParams.get('url');
+          if (target) u = target;
+        } catch {
+          // ignore
+        }
+      }
+
+      // Handle translate.goog
+      if (u.includes('translate.goog')) {
+        u = u.replace(/([a-zA-Z0-9-]+)-([a-zA-Z0-9-]+)-gov-in\.translate\.goog/g, '$1.$2.gov.in')
+             .replace(/([a-zA-Z0-9-]+)-gov-in\.translate\.goog/g, '$1.gov.in')
+             .replace(/\.translate\.goog/g, '');
+      }
+
+      if (u.includes(':8080')) {
+        u = u.replace(':8080', '');
+      }
+
+      const lineLower = line.toLowerCase();
+      const uLower = u.toLowerCase();
+      let score = 10;
+
+      for (const [kws, sVal] of priorityKeywords) {
+        if (kws.some(kw => lineLower.includes(kw))) {
+          score = sVal;
+          break;
+        }
+      }
+
+      try {
+        const host = new URL(u).hostname.toLowerCase();
+        if (host.endsWith('.gov.in') || host.endsWith('.nic.in')) {
+          score += 50;
+        } else if (host.endsWith('.org.in') || host.endsWith('.ac.in') || host.endsWith('.res.in') || host.endsWith('.edu.in') || host.endsWith('.in')) {
+          score += 20;
+        }
+
+        if (['drive.google.com', 'docs.google.com', 'dropbox.com', 'amazonaws.com', 'govtschemes.in', 'google.com', 'google.co.in'].some(b => host.includes(b))) {
+          score -= 100;
+        }
+      } catch {
+        continue;
+      }
+
+      if (uLower.endsWith('.pdf')) {
+        score -= 25;
+      } else {
+        score += 15;
+      }
+
+      candidates.push({ score, url: u });
+    }
+  }
+
+  if (candidates.length === 0) return '';
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0].score > 0 ? candidates[0].url : '';
+}
+
 export function getSafeOfficialUrl(scheme: Scheme | null | undefined): string {
   if (!scheme) return 'https://services.india.gov.in';
 
-  let url = scheme.verification?.officialPortalUrl?.trim();
-  if (url && url !== '#' && url.toLowerCase() !== 'none' && !url.includes('myscheme.gov.in')) {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = `https://${url}`;
-    }
-    return url;
+  const rawUrl = scheme.verification?.officialPortalUrl?.trim();
+  const cleanExtracted = extractCleanPortalUrl(rawUrl);
+
+  if (cleanExtracted && cleanExtracted !== '#' && cleanExtracted.toLowerCase() !== 'none' && !cleanExtracted.includes('myscheme.gov.in')) {
+    return cleanExtracted;
   }
 
   // Resolve direct application portal from scheme identity & category
@@ -219,7 +309,10 @@ export const ExternalPortalModal: React.FC<ExternalPortalModalProps> = ({
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
             <span className="text-xs font-medium text-slate-700 block mb-0.5">{t('modal.dest_scheme', undefined, 'Destination Scheme:')}</span>
             <div className="font-bold text-slate-900 text-base">{scheme.name}</div>
-            <div className="text-xs text-teal-800 font-medium mt-1 flex items-center gap-1">
+            <div className="mt-1.5 flex items-center gap-2">
+              <DeadlineTicker scheme={scheme} variant="badge" />
+            </div>
+            <div className="text-xs text-teal-800 font-medium mt-1.5 flex items-center gap-1">
               <span>{t('modal.managed_by', undefined, 'Managed by:')}</span>
               <span className="text-slate-800">{scheme.verification?.ministryOrAuthority || 'Government Department'}</span>
             </div>

@@ -17,6 +17,7 @@ import {
   saveUserProfile,
   getCachedRecommendations,
   saveCachedRecommendations,
+  clearCachedRecommendations,
   getSavedSchemes as getLocalSavedSchemes,
   toggleSaveScheme as toggleLocalSaveScheme,
   getTrackerItems as getLocalTrackerItems,
@@ -156,7 +157,7 @@ class HttpApiClient {
     }
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2500);
+      const timer = setTimeout(() => controller.abort(), 6000);
       const res = await fetch(`${this.baseUrl}/api/sessions/`, {
         method: 'POST',
         signal: controller.signal,
@@ -174,7 +175,7 @@ class HttpApiClient {
       }
       return token;
     } catch (err) {
-      this.isBackendAvailable = false;
+      console.warn('[httpClient] session creation blip, using fallback:', err);
       const fallbackToken = 'offline-session-token';
       this._token = fallbackToken;
       return fallbackToken;
@@ -183,15 +184,16 @@ class HttpApiClient {
 
   private async request<T>(
     path: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeoutMs: number = 25000
   ): Promise<T> {
-    if (!this.baseUrl || this.isBackendAvailable === false) {
-      throw new Error('Backend server is not available');
+    if (!this.baseUrl) {
+      throw new Error('Backend server is not configured');
     }
 
     const token = await this.getToken();
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
@@ -230,27 +232,28 @@ class HttpApiClient {
       if (res.status === 204) return {} as T;
       return res.json() as Promise<T>;
     } catch (err) {
-      this.isBackendAvailable = false;
+      // Log warning but do not permanently disable backend on a slow request
+      console.warn(`[httpClient] Request to ${path} encountered error:`, err);
       throw err;
     }
   }
 
-  private post<T>(path: string, body: unknown): Promise<T> {
+  private post<T>(path: string, body: unknown, timeoutMs: number = 25000): Promise<T> {
     return this.request<T>(path, {
       method: 'POST',
       body: JSON.stringify(body),
-    });
+    }, timeoutMs);
   }
 
-  private put<T>(path: string, body: unknown): Promise<T> {
+  private put<T>(path: string, body: unknown, timeoutMs: number = 20000): Promise<T> {
     return this.request<T>(path, {
       method: 'PUT',
       body: JSON.stringify(body),
-    });
+    }, timeoutMs);
   }
 
-  private del<T>(path: string): Promise<T> {
-    return this.request<T>(path, { method: 'DELETE' });
+  private del<T>(path: string, timeoutMs: number = 15000): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE' }, timeoutMs);
   }
 
   // ── Profile & Survey ──────────────────────────────────────────────────────
@@ -280,6 +283,8 @@ class HttpApiClient {
     const current = getUserProfile() || {};
     const updated = { ...current, ...profile } as UserProfile;
     saveUserProfile(updated);
+    clearCachedRecommendations();
+    this.clearCache();
 
     if (this.baseUrl && this.isBackendAvailable !== false) {
       try {
@@ -296,6 +301,8 @@ class HttpApiClient {
     profile: UserProfile
   ): Promise<{ profile: UserProfile; recommendations: SchemeMatchResult[] }> {
     saveUserProfile(profile);
+    clearCachedRecommendations();
+    this.clearCache();
 
     if (this.baseUrl && this.isBackendAvailable !== false) {
       try {
@@ -304,9 +311,19 @@ class HttpApiClient {
           recommendations: SchemeMatchResult[];
         }>('/api/survey/submit/', { profile });
         if (data?.recommendations && Array.isArray(data.recommendations)) {
-          const cacheKey = `recs_${JSON.stringify(profile || {})}`;
+          const profileHash = JSON.stringify({
+            age: profile?.age,
+            gender: profile?.gender,
+            state: profile?.state,
+            occ: profile?.employmentType || profile?.occupation,
+            cat: profile?.category,
+            inc: profile?.incomeRange,
+            bpl: profile?.hasBPLCard || profile?.isBPL,
+            dis: profile?.isDisability || profile?.hasDisability,
+            min: profile?.isMinority
+          });
+          const cacheKey = `recs_${profileHash}`;
           this.setCached(cacheKey, data.recommendations, 180000);
-          this.setCached('recs_latest', data.recommendations, 180000);
           saveCachedRecommendations(data.recommendations);
           return data;
         }
@@ -357,28 +374,29 @@ class HttpApiClient {
 
   async getRecommendations(profile?: UserProfile): Promise<SchemeMatchResult[]> {
     const userProfile = profile || getUserProfile();
-    const cacheKey = `recs_${JSON.stringify(userProfile || {})}`;
-    const cached = this.getCached<SchemeMatchResult[]>(cacheKey) || (!profile ? this.getCached<SchemeMatchResult[]>('recs_latest') : null);
+    const profileHash = JSON.stringify({
+      age: userProfile?.age,
+      gender: userProfile?.gender,
+      state: userProfile?.state,
+      occ: userProfile?.employmentType || userProfile?.occupation,
+      cat: userProfile?.category,
+      inc: userProfile?.incomeRange,
+      bpl: userProfile?.hasBPLCard || userProfile?.isBPL,
+      dis: userProfile?.isDisability || userProfile?.hasDisability,
+      min: userProfile?.isMinority
+    });
+    const cacheKey = `recs_${profileHash}`;
+    const cached = this.getCached<SchemeMatchResult[]>(cacheKey);
     if (cached && cached.length > 0) return cached;
-
-    // Check localStorage cache if memory cache is empty and no specific profile was passed
-    if (!profile) {
-      const persistentCached = getCachedRecommendations();
-      if (persistentCached && persistentCached.length > 0) {
-        this.setCached(cacheKey, persistentCached, 180000);
-        this.setCached('recs_latest', persistentCached, 180000);
-        return persistentCached;
-      }
-    }
 
     // 1. Try backend
     if (this.baseUrl && this.isBackendAvailable !== false) {
       try {
         let recs: SchemeMatchResult[] = [];
-        if (profile) {
+        if (userProfile) {
           const data = await this.post<{ recommendations: SchemeMatchResult[] }>(
             '/api/recommendations/',
-            { profile }
+            { profile: userProfile }
           );
           recs = data.recommendations;
         } else {
@@ -390,7 +408,6 @@ class HttpApiClient {
         if (recs && recs.length > 0) {
           this.isBackendAvailable = true;
           this.setCached(cacheKey, recs, 180000);
-          this.setCached('recs_latest', recs, 180000);
           saveCachedRecommendations(recs);
           return recs;
         }
@@ -424,11 +441,10 @@ class HttpApiClient {
     }
 
     matches.sort((a, b) => (b.matchScore - a.matchScore) || ((b.scheme.popularScore || 0) - (a.scheme.popularScore || 0)));
-    const topMatches = matches.slice(0, 30);
-    this.setCached(cacheKey, topMatches, 180000);
-    this.setCached('recs_latest', topMatches, 180000);
-    saveCachedRecommendations(topMatches);
-    return topMatches;
+    this.setCached(cacheKey, matches, 180000);
+    this.setCached('recs_latest', matches, 180000);
+    saveCachedRecommendations(matches);
+    return matches;
   }
 
   // ── Schemes catalogue ─────────────────────────────────────────────────────
@@ -646,7 +662,7 @@ class HttpApiClient {
     profileUpdated?: boolean;
     updatedProfile?: Partial<UserProfile>;
   }> {
-    if (this.baseUrl && this.isBackendAvailable !== false) {
+    if (this.baseUrl) {
       try {
         const data = await this.post<{
           answer: string;

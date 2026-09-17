@@ -26,10 +26,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
   const hasDisability = Boolean(profile.hasDisability ?? profile.isDisability);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="space-y-5 lg:space-y-4 animate-in fade-in duration-200">
       <div>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
+          <span className="text-xs font-bold text-teal-800 dark:text-teal-400 uppercase tracking-wider">
             {t('survey.stepOf', { step: 3, total: 6 })} {t('survey.stepBackground')}
           </span>
           <div className="flex items-center gap-3">
@@ -45,9 +45,9 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
               <button
                 type="button"
                 onClick={() => setShowTooltip(!showTooltip)}
-                className="inline-flex items-center gap-1 text-xs text-slate-700 hover:text-teal-900 font-semibold cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 hover:text-teal-900 dark:hover:text-teal-300 font-semibold cursor-pointer"
               >
-                <HelpCircle className="w-4 h-4 text-teal-700" />
+                <HelpCircle className="w-4 h-4 text-teal-700 dark:text-teal-400" />
                 <span>Why do we ask this?</span>
               </button>
 
@@ -66,20 +66,20 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
           </div>
         </div>
 
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-1.5">
           {t('survey.stepBackground')}
         </h2>
-        <p className="text-sm text-slate-600 mt-1">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">
           {t('howItWorks.subtitle')}
         </p>
       </div>
 
       {/* Category Grid */}
-      <div className="space-y-3">
-        <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+      <div className="space-y-2.5">
+        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
           {t('survey.categoryLabel')} <span className="text-rose-500">*</span>
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {categories.map((cat) => {
             const isSelected = profile.category === cat.id;
             return (
@@ -87,25 +87,25 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                 key={cat.id}
                 type="button"
                 onClick={() => onChange({ category: cat.id as any })}
-                className={`p-4 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
+                className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
                   isSelected
-                    ? 'border-teal-600 bg-teal-50/80 shadow-md ring-2 ring-teal-500/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    ? 'border-teal-600 dark:border-teal-400 bg-teal-50/80 dark:bg-teal-950/70 shadow-md ring-2 ring-teal-500/20'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/90 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-sm font-bold ${isSelected ? 'text-teal-950' : 'text-slate-800'}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-sm font-bold ${isSelected ? 'text-teal-950 dark:text-teal-200' : 'text-slate-800 dark:text-slate-100'}`}>
                     {cat.label}
                   </span>
                   <div
                     className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      isSelected ? 'border-teal-700 bg-teal-700' : 'border-slate-300'
+                      isSelected ? 'border-teal-700 dark:border-teal-400 bg-teal-700 dark:bg-teal-500' : 'border-slate-300 dark:border-slate-600'
                     }`}
                   >
                     {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
                 </div>
-                <p className="text-xs text-slate-500">{cat.desc}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">{cat.desc}</p>
               </button>
             );
           })}
@@ -113,16 +113,16 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
       </div>
 
       {/* Disability Signal */}
-      <div className="space-y-4 pt-4 border-t border-slate-200/80">
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="space-y-3 pt-3 border-t border-slate-200/80 dark:border-slate-800">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
               <HeartPulse className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <span className="text-sm font-bold text-slate-900 block">
+                <span className="text-sm font-bold text-slate-900 dark:text-white block">
                   {t('survey.disabilityLabel')}
                 </span>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Enables assistive device subsidies (ADIP), UDID card benefits, and reservation allowances.
                 </p>
               </div>
@@ -138,10 +138,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                     disabilityPercentage: undefined,
                   })
                 }
-                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                   !hasDisability
-                    ? 'bg-slate-800 text-white border-slate-800'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    ? 'bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-600'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
                 }`}
               >
                 {t('survey.no')}
@@ -155,10 +155,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
                     disabilityPercentage: profile.disabilityPercentage || 40,
                   })
                 }
-                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                   hasDisability
-                    ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    ? 'bg-teal-700 dark:bg-teal-600 text-white border-teal-700 dark:border-teal-600 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
                 }`}
               >
                 {t('survey.yes')}
@@ -168,36 +168,43 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
 
           {/* Conditional Percentage */}
           {hasDisability && (
-            <div className="pt-3 border-t border-slate-200 flex items-center gap-3 animate-in fade-in">
-              <label className="text-xs font-bold text-slate-700 shrink-0">
-                {t('survey.disabilityPercent')}:
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={profile.disabilityPercentage ?? 40}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  onChange({ disabilityPercentage: isNaN(val) ? 0 : Math.min(Math.max(val, 0), 100) });
-                }}
-                className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:border-teal-600 outline-hidden"
-              />
-              <span className="text-xs text-slate-500 font-medium">(Benchmark standard is 40%+)</span>
+            <div className="pt-2.5 border-t border-slate-200 dark:border-slate-700 space-y-1.5 animate-in fade-in">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {t('survey.disabilityPercent')}:
+                </label>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={profile.disabilityPercentage ?? 40}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      onChange({ disabilityPercentage: isNaN(val) ? 0 : Math.min(Math.max(val, 0), 100) });
+                    }}
+                    className="w-20 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:border-teal-600 outline-hidden text-center"
+                  />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">%</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
+                (Standard statutory benchmark under RPwD Act is 40%+)
+              </p>
             </div>
           )}
         </div>
 
-        {/* Minority Community (shown when disability is No or independent) */}
+        {/* Minority Community */}
         {!hasDisability && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 animate-in fade-in">
             <div className="flex items-start gap-3">
-              <Users className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+              <Users className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
               <div>
-                <span className="text-sm font-bold text-slate-900 block">
+                <span className="text-sm font-bold text-slate-900 dark:text-white block">
                   Do you belong to a minority community?
                 </span>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Muslim, Christian, Sikh, Buddhist, Jain, Parsi notified communities under National Minority Commission.
                 </p>
               </div>
@@ -207,10 +214,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
               <button
                 type="button"
                 onClick={() => onChange({ isMinority: false })}
-                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                   !profile.isMinority
-                    ? 'bg-slate-800 text-white border-slate-800'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    ? 'bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-600'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
                 }`}
               >
                 {t('survey.no')}
@@ -218,10 +225,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
               <button
                 type="button"
                 onClick={() => onChange({ isMinority: true })}
-                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                   profile.isMinority
-                    ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    ? 'bg-teal-700 dark:bg-teal-600 text-white border-teal-700 dark:border-teal-600 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
                 }`}
               >
                 {t('survey.yes')}
@@ -231,14 +238,14 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
         )}
 
         {/* BPL / Ration Card Status */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
           <div className="flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="text-sm font-bold text-slate-900 block">
+              <span className="text-sm font-bold text-slate-900 dark:text-white block">
                 {t('survey.bplLabel')}
               </span>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Priority for Ayushman Bharat cashless hospital care, housing subsidies, and subsidized rations.
               </p>
             </div>
@@ -248,10 +255,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
             <button
               type="button"
               onClick={() => onChange({ hasBPLCard: false, isBPL: false })}
-              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                 !(profile.hasBPLCard || profile.isBPL)
-                  ? 'bg-slate-800 text-white border-slate-800'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  ? 'bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-600'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
               }`}
             >
               {t('survey.no')}
@@ -259,10 +266,10 @@ export const StepBackground: React.FC<StepBackgroundProps> = ({ profile, onChang
             <button
               type="button"
               onClick={() => onChange({ hasBPLCard: true, isBPL: true })}
-              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                 profile.hasBPLCard || profile.isBPL
-                  ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  ? 'bg-teal-700 dark:bg-teal-600 text-white border-teal-700 dark:border-teal-600 shadow-xs'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
               }`}
             >
               {t('survey.yes')}

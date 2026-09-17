@@ -74,43 +74,84 @@ def convert_odia_numbers(text: str) -> str:
 
 def prepare_odia_for_neural_speech(text: str) -> str:
     """
-    Transliterates Odia Unicode characters to Eastern Indic phonetics (Bengali script)
-    with precise Odia phonetic mapping so that the Eastern Indic neural voice speaks
-    with a natural, authentic Odia cadence, vowel harmony, and accurate consonants.
+    Transliterates Odia Unicode characters to Devanagari phonetics with precise
+    Odia phonetic mapping (crisp dental 'S', authentic 'J' for ଯ, 'Y' for ୟ, 'W' for ୱ, 'L' for ଳ,
+    and composite matras) so that the neural voice speaks with natural, authentic Odia pronunciation
+    without Bengali sibilant distortions, and preserving authentic Odia inherent
+    final vowels so Hindi engines do not delete word-ending vowels with foreign schwa-deletion.
     """
-    expanded = convert_odia_numbers(text)
+    raw_expanded = convert_odia_numbers(text)
+
+    # 1. Naturalize geminate retroflex nasal ଣ୍ଣ -> ଣ (e.g. ସମ୍ପୂର୍ଣ୍ଣ -> ସମ୍ପୂର୍ଣ -> सम्पूर्ण)
+    s = raw_expanded.replace('ଣ୍ଣ', 'ଣ')
+
+    # 2. Preserve authentic Odia word-final vowels ('o' sound) on open-ended syllables:
+    # In Odia, words ending in -ର, -ଜ, -ବ, -ଭ, -ଳ, -ତ do NOT drop their vowels like Hindi!
+    tokens = re.split(r'(\s+|[.,!?।॥;:\(\)\[\]"\'\-]+)', s)
+    out_tokens = []
+    for tok in tokens:
+        if not tok or re.match(r'^\s+$|[.,!?।॥;:\(\)\[\]"\'\-]+', tok):
+            out_tokens.append(tok)
+            continue
+
+        if tok.endswith('ର'):
+            tok = tok[:-1] + 'ରୋ'
+        elif tok.endswith('ଜ') and len(tok) > 1:
+            tok = tok[:-1] + 'ଜୋ'
+        elif tok.endswith('ବ') and len(tok) > 1:
+            tok = tok[:-1] + 'ବୋ'
+        elif tok.endswith('ଭ') and len(tok) > 1:
+            tok = tok[:-1] + 'ଭୋ'
+        elif tok.endswith('ଳ') and len(tok) > 1:
+            tok = tok[:-1] + 'ଳୋ'
+        elif tok.endswith('ତ') and len(tok) > 2:
+            tok = tok[:-1] + 'ତୋ'
+
+        out_tokens.append(tok)
+
+    expanded = ''.join(out_tokens)
     res = []
-    for ch in expanded:
+    i = 0
+    n = len(expanded)
+    while i < n:
+        ch = expanded[i]
         c = ord(ch)
         if 0x0B00 <= c <= 0x0B7F:
-            if c == 0x0B2F:    # ଯ -> য (in Bengali pronounced 'J')
-                res.append('\u09AF')
-            elif c == 0x0B5F:  # ୟ -> য় (in Bengali pronounced 'Y')
-                res.append('\u09DF')
-            elif c == 0x0B33:  # ଳ -> ল (L)
-                res.append('\u09B2')
-            elif c == 0x0B71:  # ୱ -> ও (W/O)
-                res.append('\u0993')
-            elif c == 0x0B5C:  # ଡ଼ -> ড় (Flap D)
-                res.append('\u09DC')
-            elif c == 0x0B5D:  # ଢ଼ -> ঢ় (Flap Dh)
-                res.append('\u09DD')
-            elif c == 0x0B37:  # ଷ -> ষ
-                res.append('\u09B7')
-            elif c == 0x0B36:  # ଶ -> শ
-                res.append('\u09B6')
-            elif c == 0x0B38:  # ସ -> স
-                res.append('\u09B8')
-            elif c == 0x0B0B:  # ଋ -> ঋ
-                res.append('\u098B')
-            elif c == 0x0B43:  # ୃ -> ৃ
-                res.append('\u09C3')
+            if c == 0x0B2F:    # ଯ -> if preceded by halant (୍), it's a ya-phala pronounced as 'य' (\u092F). Otherwise independent 'ज' (\u091C)
+                if i > 0 and ord(expanded[i - 1]) == 0x0B4D:
+                    res.append('\u092F')
+                else:
+                    res.append('\u091C')
+            elif c == 0x0B5F:  # ୟ -> य (Y)
+                res.append('\u092F')
+            elif c == 0x0B71:  # ୱ -> व (W/V)
+                res.append('\u0935')
+            elif c == 0x0B33:  # ଳ -> ल (L)
+                res.append('\u0932')
+            elif c == 0x0B38:  # ସ -> स (Crisp Dental S, never Bengali Sh!)
+                res.append('\u0938')
+            elif c == 0x0B36:  # ଶ -> श
+                res.append('\u0936')
+            elif c == 0x0B37:  # ଷ -> ष
+                res.append('\u0937')
+            elif c == 0x0B5C:  # ଡ଼ -> ड़ (Flap D)
+                res.append('\u095C')
+            elif c == 0x0B5D:  # ଢ଼ -> ढ़ (Flap Dh)
+                res.append('\u095D')
+            elif c == 0x0B47 and i + 1 < n and ord(expanded[i + 1]) == 0x0B3E:  # େ + ା = ୋ (ो)
+                res.append('\u094B')
+                i += 1
+            elif c == 0x0B47 and i + 1 < n and ord(expanded[i + 1]) == 0x0B57:  # େ + ୗ = ୌ (ौ)
+                res.append('\u094C')
+                i += 1
+            elif 0x0B01 <= c <= 0x0B75:
+                # Direct script conversion offset: 0x0B00 - 0x0900 = 0x0200
+                res.append(chr(c - 0x0200))
             else:
-                # Direct script conversion offset: 0x0B00 - 0x0980 = 0x0180
-                bn_char = chr(c - 0x0180)
-                res.append(bn_char)
+                res.append(ch)
         else:
             res.append(ch)
+        i += 1
     return ''.join(res)
 
 
@@ -127,9 +168,8 @@ async def synthesize_neural_speech(text: str, lang: str = "or-IN", rate: float =
 
     # Voice selection
     if lang_prefix == "or":
-        # TanishaaNeural is an Eastern Indic sister voice having the exact same
-        # melodic cadence, soft dentals, retroflexes, and inherent vowel [ɔ] as Odia.
-        voice = "bn-IN-TanishaaNeural"
+        # SwaraNeural speaks crisp Indic phonetics with authentic Dental S, J, and Odia cadence
+        voice = "hi-IN-SwaraNeural"
         speech_text = prepare_odia_for_neural_speech(clean_text)
     elif lang_prefix == "hi":
         voice = "hi-IN-SwaraNeural"

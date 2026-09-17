@@ -42,17 +42,17 @@ export const StatusPill: React.FC<StatusPillProps> = ({
   }
 
   if (type === 'level') {
-    const isCentral = value === 'Central';
+    const isCentral = value === 'Central' || value?.toLowerCase?.().includes('central') || value?.includes?.('केंद्रीय');
     return (
       <span
-        className={`inline-flex items-center gap-1 font-semibold rounded-full border ${sizeClasses} ${
+        className={`inline-flex items-center gap-1 font-semibold rounded-full border max-w-full shrink-0 ${sizeClasses} ${
           isCentral
             ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
             : 'bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
         } ${className}`}
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${isCentral ? 'bg-blue-600 dark:bg-blue-400' : 'bg-purple-600 dark:bg-purple-400'}`} />
-        <span>{tp(value)}</span>
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCentral ? 'bg-blue-600 dark:bg-blue-400' : 'bg-purple-600 dark:bg-purple-400'}`} />
+        <span className="truncate">{tp(value)}</span>
       </span>
     );
   }
@@ -134,14 +134,32 @@ export const StatusPill: React.FC<StatusPillProps> = ({
     }
   };
 
+  // Robust canonical category resolver (supports English + Indic strings)
+  const resolveCanonicalCategory = (val: string): SchemeCategory => {
+    if (!val) return 'Financial Assistance';
+    const lower = val.toLowerCase();
+    if (lower.includes('edu') || lower.includes('शिक्ष') || lower.includes('ଶିକ୍ଷା') || lower.includes('கல்வி') || lower.includes('విద్య')) return 'Education';
+    if (lower.includes('agri') || lower.includes('कॄष') || lower.includes('कृष') || lower.includes('କୃଷି') || lower.includes('விவசாய') || lower.includes('వ్యవసాయ')) return 'Agriculture';
+    if (lower.includes('biz') || lower.includes('business') || lower.includes('व्यवसाय') || lower.includes('ବାଣିଜ୍ୟ') || lower.includes('வணிக') || lower.includes('వ్యాపార')) return 'Business';
+    if (lower.includes('women') || lower.includes('child') || lower.includes('महिला') || lower.includes('ମହିଳା') || lower.includes('மகளிர்') || lower.includes('మహిళ')) return 'Women & Child';
+    if (lower.includes('employ') || lower.includes('job') || lower.includes('रोजगार') || lower.includes('ରୋଜଗାର') || lower.includes('வேலை') || lower.includes('ఉపాధి')) return 'Employment';
+    if (lower.includes('hous') || lower.includes('आवास') || lower.includes('ଆବାସ') || lower.includes('வீட்டு') || lower.includes('గృహ')) return 'Housing';
+    if (lower.includes('health') || lower.includes('स्वास्थ्य') || lower.includes('ସ୍ୱାସ୍ଥ୍ୟ') || lower.includes('சுகாதார') || lower.includes('ఆరోగ్య')) return 'Healthcare';
+    if (lower.includes('social') || lower.includes('सुरक्षा') || lower.includes('ସୁରକ୍ଷା') || lower.includes('சமூக') || lower.includes('సామాజిక')) return 'Social Security';
+    if (lower.includes('skill') || lower.includes('कौशल') || lower.includes('ଦକ୍ଷତା') || lower.includes('திறன்') || lower.includes('నైపుణ్య')) return 'Skill Development';
+    return val as SchemeCategory;
+  };
+
+  const canonicalCat = resolveCanonicalCategory(value);
+
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-medium rounded-lg border shadow-2xs ${getCategoryBg(
-        value
+      className={`inline-flex items-center gap-1.5 font-medium rounded-lg border shadow-2xs max-w-full shrink-0 ${getCategoryBg(
+        canonicalCat
       )} ${sizeClasses} ${className}`}
     >
-      {getCategoryIcon(value as SchemeCategory)}
-      <span>{tp(value)}</span>
+      <span className="shrink-0">{getCategoryIcon(canonicalCat)}</span>
+      <span className="truncate">{tp(value)}</span>
     </span>
   );
 };

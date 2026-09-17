@@ -73,44 +73,51 @@ export const MatchScoreBadge: React.FC<MatchScoreBadgeProps> = ({
           <span className={`relative inline-flex rounded-full h-2 w-2 ${theme.bar}`} />
         </span>
 
-        <span className="font-bold tracking-tight">{score}% Profile Match</span>
+        <span className="font-bold tracking-tight">{score}% Match</span>
         {grade && <span className="hidden sm:inline text-xs opacity-85 font-normal">• {grade}</span>}
         <Info className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
       </div>
 
       {/* Interactive Explainability Tooltip */}
       {showTooltip && (
-        <div className="absolute top-full mt-2 left-0 sm:left-1/2 sm:-translate-x-1/2 z-50 w-72 sm:w-80 p-3.5 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 text-xs animate-in fade-in zoom-in-95">
-          <div className="flex items-start justify-between pb-2 mb-2 border-b border-slate-800">
+        <div className="absolute top-full mt-2 left-0 sm:left-1/2 sm:-translate-x-1/2 z-50 w-72 sm:w-84 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 text-xs animate-in fade-in zoom-in-95 space-y-2.5">
+          <div className="flex items-start justify-between pb-2 border-b border-slate-800">
             <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Match Scoring Breakdown</span>
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Score Tracked From 0</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 font-mono">
-              Score: {score}/100
+            <span className="px-2 py-0.5 rounded-md bg-slate-800 text-emerald-400 font-mono font-bold text-xs border border-slate-700">
+              {score} / 100
             </span>
           </div>
 
-          <p className="text-slate-300 leading-relaxed mb-2.5">
-            This score represents how closely your provided profile matches the listed eligibility conditions.
+          <p className="text-slate-300 text-[11px] leading-relaxed">
+            Starting from <strong>0 baseline</strong>, points are accumulated across statutory alignment factors:
           </p>
 
-          {factors.length > 0 && (
-            <div className="space-y-1.5 mb-2.5 pt-1">
+          {factors.length > 0 ? (
+            <div className="space-y-1.5 pt-1">
               {factors.slice(0, 4).map((f, idx) => (
-                <div key={idx} className="flex items-center justify-between text-[11px] text-slate-300">
-                  <span className="truncate pr-2">{f.criterion}</span>
-                  <span className={`font-medium ${f.status === 'matched' ? 'text-emerald-400' : f.status === 'mismatch' ? 'text-amber-400' : 'text-slate-400'}`}>
+                <div key={idx} className="flex items-center justify-between text-[11px] bg-slate-800/60 px-2.5 py-1.5 rounded-xl border border-slate-750">
+                  <div className="flex flex-col min-w-0 pr-2">
+                    <span className="truncate text-slate-200 font-medium">{f.criterion}</span>
+                    {f.explanation && (
+                      <span className="truncate text-[10px] text-slate-400">{f.explanation}</span>
+                    )}
+                  </div>
+                  <span className={`font-mono font-bold shrink-0 ${f.status === 'matched' || f.score > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
                     +{f.score} pts
                   </span>
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="text-[11px] text-slate-400">Score evaluated based on general public criteria.</div>
           )}
 
-          <div className="p-2 rounded bg-slate-800/80 text-[11px] text-amber-300/90 flex items-start gap-1.5">
+          <div className="p-2 rounded-xl bg-slate-800/80 text-[10.5px] text-amber-300/90 flex items-start gap-1.5 border border-slate-700">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            <span>Important: Informational indicator only. Official eligibility and approval are determined by the concerned government authority.</span>
+            <span>Informational fit indicator. Official approval is governed by department verification.</span>
           </div>
         </div>
       )}

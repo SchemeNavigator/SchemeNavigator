@@ -163,28 +163,28 @@ export const StepReview: React.FC<StepReviewProps> = ({ profile, onEditStep }) =
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="space-y-5 lg:space-y-4 animate-in fade-in duration-200">
       {/* Header */}
       <div>
-        <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
+        <span className="text-xs font-bold text-teal-800 dark:text-teal-400 uppercase tracking-wider">
           {t('survey.step6_badge', undefined, 'Step 6 of 6 • Review & Confirmation')}
         </span>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-1.5">
           {t('survey.step6_title', undefined, 'Your Eligibility Profile Summary')}
         </h2>
-        <p className="text-sm text-slate-600 mt-1">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">
           {t('survey.step6_desc', undefined, 'Review your answers before our matching engine evaluates thousands of scheme conditions.')}
         </p>
       </div>
 
       {/* Prominent Red Alert when Mandatory Fields are Missing */}
       {missingFields.length > 0 && (
-        <div className="p-5 rounded-2xl bg-rose-50 border-2 border-rose-500/80 shadow-lg shadow-rose-500/10 text-rose-950 space-y-3 animate-in slide-in-from-top-2">
-          <div className="flex items-center gap-2.5 text-rose-800 font-extrabold text-sm sm:text-base">
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 animate-pulse" />
+        <div className="p-4 sm:p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-500/80 dark:border-rose-700 shadow-lg shadow-rose-500/10 text-rose-950 dark:text-rose-200 space-y-2.5 animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5 text-rose-800 dark:text-rose-300 font-extrabold text-sm sm:text-base">
+            <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />
             <span>⚠️ Mandatory Profile Details Incomplete</span>
           </div>
-          <p className="text-xs sm:text-sm text-rose-900 font-semibold leading-relaxed">
+          <p className="text-xs sm:text-sm text-rose-900 dark:text-rose-200 font-semibold leading-relaxed">
             You cannot find eligible schemes until all mandatory details are provided. Schemes require your Age, Gender, State, and Occupation to calculate accurate statutory eligibility.
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -193,7 +193,7 @@ export const StepReview: React.FC<StepReviewProps> = ({ profile, onEditStep }) =
                 key={item.field}
                 type="button"
                 onClick={() => onEditStep(item.step)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-sm transition-all cursor-pointer"
               >
                 <span>Complete Step {item.step} ({item.label})</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -204,27 +204,27 @@ export const StepReview: React.FC<StepReviewProps> = ({ profile, onEditStep }) =
       )}
 
       {/* Review Summary Grid */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {summaryItems.map((section) => {
           const Icon = section.icon;
           return (
             <div
               key={section.step}
-              className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
             >
-              <div className="space-y-2 flex-1">
-                <div className="flex items-center gap-2 text-xs font-bold text-teal-900 uppercase tracking-wider">
-                  <Icon className="w-4 h-4 text-teal-700" />
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2 text-xs font-bold text-teal-900 dark:text-teal-300 uppercase tracking-wider">
+                  <Icon className="w-4 h-4 text-teal-700 dark:text-teal-400" />
                   <span>{section.title}</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-0.5">
                   {section.items.map((item, iIdx) => (
                     <div key={iIdx}>
-                      <span className="text-[11px] text-slate-600 font-medium block">
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium block">
                         {item.label}
                       </span>
-                      <span className="text-sm font-bold text-slate-900 truncate block">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate block">
                         {item.value}
                       </span>
                     </div>
@@ -235,7 +235,7 @@ export const StepReview: React.FC<StepReviewProps> = ({ profile, onEditStep }) =
               <button
                 type="button"
                 onClick={() => onEditStep(section.step)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-900 text-xs font-bold transition-colors shrink-0 self-start sm:self-center cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700/80 hover:bg-teal-50 dark:hover:bg-teal-950/70 text-slate-700 dark:text-slate-300 hover:text-teal-900 dark:hover:text-teal-300 text-xs font-bold transition-colors shrink-0 self-start sm:self-center cursor-pointer"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>{t('common.edit', undefined, 'Edit')}</span>
@@ -246,10 +246,10 @@ export const StepReview: React.FC<StepReviewProps> = ({ profile, onEditStep }) =
       </div>
 
       {/* Trust & Privacy Notice */}
-      <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200/80 text-xs text-slate-700 flex items-start gap-3">
-        <Lock className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-teal-50/70 dark:bg-teal-950/40 border border-teal-200/80 dark:border-teal-800/60 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-3">
+        <Lock className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
         <div>
-          <span className="font-bold text-teal-950 block mb-0.5">{t('survey.privacy_assurance_title', undefined, 'Privacy Assurance:')}</span>
+          <span className="font-bold text-teal-950 dark:text-teal-300 block mb-0.5">{t('survey.privacy_assurance_title', undefined, 'Privacy Assurance:')}</span>
           {t('survey.privacy_assurance_desc', undefined, 'Your profile signals are evaluated securely according to data minimization principles. We use these parameters solely to calculate statutory eligibility compatibility scores.')}
         </div>
       </div>

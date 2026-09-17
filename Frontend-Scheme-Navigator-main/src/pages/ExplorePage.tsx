@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { Scheme } from '../types';
 import { SCHEME_CATEGORIES, INDIAN_STATES, DEFAULT_CATEGORY_COUNTS } from '../constants';
 import { StatusPill } from '../components/common/StatusPill';
+import { DeadlineTicker } from '../components/calendar/DeadlineTicker';
 import { useTranslation } from '../hooks/useTranslation';
 import {
   Search,
@@ -14,9 +15,48 @@ import {
   X,
   Compass,
   Loader2,
+  Layers,
+  ChevronDown,
+  Sparkles,
+  GraduationCap,
+  Sprout,
+  Briefcase,
+  Coins,
+  HeartHandshake,
+  Home,
+  ShieldPlus,
+  UserCheck,
+  Lightbulb,
 } from 'lucide-react';
 import { isSchemeSaved, toggleSaveScheme } from '../services/storageService';
 import { translateSchemeContent } from '../utils/schemeTranslator';
+
+const getCategoryIcon = (category: string) => {
+  switch (category) {
+    case 'Education':
+      return <GraduationCap className="w-3.5 h-3.5 shrink-0" />;
+    case 'Agriculture':
+      return <Sprout className="w-3.5 h-3.5 shrink-0" />;
+    case 'Employment':
+      return <UserCheck className="w-3.5 h-3.5 shrink-0" />;
+    case 'Business':
+      return <Briefcase className="w-3.5 h-3.5 shrink-0" />;
+    case 'Women & Child':
+      return <HeartHandshake className="w-3.5 h-3.5 shrink-0" />;
+    case 'Housing':
+      return <Home className="w-3.5 h-3.5 shrink-0" />;
+    case 'Healthcare':
+      return <ShieldPlus className="w-3.5 h-3.5 shrink-0" />;
+    case 'Social Security':
+      return <UserCheck className="w-3.5 h-3.5 shrink-0" />;
+    case 'Financial Assistance':
+      return <Coins className="w-3.5 h-3.5 shrink-0" />;
+    case 'Skill Development':
+      return <Lightbulb className="w-3.5 h-3.5 shrink-0" />;
+    default:
+      return <Sparkles className="w-3.5 h-3.5 shrink-0" />;
+  }
+};
 
 export const ExplorePage: React.FC = () => {
   const { t, tCategory, tState, langCode } = useTranslation();
@@ -166,67 +206,79 @@ export const ExplorePage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
             {/* Search Bar */}
             <div className="md:col-span-6 relative">
-              <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder={t('explore.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-teal-600 focus:bg-white dark:focus:bg-slate-800 rounded-2xl text-xs sm:text-sm font-medium outline-hidden transition-all"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+              <div className="relative flex items-center">
+                <Search className="absolute left-3.5 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none z-10" />
+                <input
+                  type="text"
+                  placeholder={t('explore.searchPlaceholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-9 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-teal-600 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-teal-500/20 rounded-2xl text-xs sm:text-sm font-medium outline-hidden transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* State Filter */}
-            <div className="md:col-span-3">
-              <select
-                value={selectedState}
-                onChange={(e) => handleStateChange(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-teal-600 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer"
-              >
-                <option value="All India" className="dark:bg-slate-800 dark:text-white">{tState('All India')}</option>
-                {INDIAN_STATES.filter((s) => s !== 'All India').map((st) => (
-                  <option key={st} value={st} className="dark:bg-slate-800 dark:text-white">
-                    {tState(st)}
-                  </option>
-                ))}
-              </select>
+            <div className="md:col-span-3 relative">
+              <div className="relative flex items-center">
+                <MapPin className="w-4 h-4 text-teal-600 dark:text-teal-400 absolute left-3.5 pointer-events-none z-10" />
+                <select
+                  value={selectedState}
+                  onChange={(e) => handleStateChange(e.target.value)}
+                  className="w-full appearance-none pl-10 pr-9 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer transition-all truncate"
+                >
+                  <option value="All India" className="dark:bg-slate-800 dark:text-white">{tState('All India')}</option>
+                  {INDIAN_STATES.filter((s) => s !== 'All India').map((st) => (
+                    <option key={st} value={st} className="dark:bg-slate-800 dark:text-white">
+                      {tState(st)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 pointer-events-none" />
+              </div>
             </div>
 
             {/* Level Filter */}
-            <div className="md:col-span-3">
-              <select
-                value={selectedLevel}
-                onChange={(e) => handleLevelChange(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:border-teal-600 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer"
-              >
-                <option value="All" className="dark:bg-slate-800 dark:text-white">{t('explore.allLevels')}</option>
-                <option value="Central" className="dark:bg-slate-800 dark:text-white">{t('explore.central')}</option>
-                <option value="State" className="dark:bg-slate-800 dark:text-white">{t('explore.state')}</option>
-              </select>
+            <div className="md:col-span-3 relative">
+              <div className="relative flex items-center">
+                <Layers className="w-4 h-4 text-teal-600 dark:text-teal-400 absolute left-3.5 pointer-events-none z-10" />
+                <select
+                  value={selectedLevel}
+                  onChange={(e) => handleLevelChange(e.target.value)}
+                  className="w-full appearance-none pl-10 pr-9 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 rounded-2xl text-xs sm:text-sm font-semibold outline-hidden cursor-pointer transition-all truncate"
+                >
+                  <option value="All" className="dark:bg-slate-800 dark:text-white">{t('explore.allLevels')}</option>
+                  <option value="Central" className="dark:bg-slate-800 dark:text-white">{t('explore.central')}</option>
+                  <option value="State" className="dark:bg-slate-800 dark:text-white">{t('explore.state')}</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 pointer-events-none" />
+              </div>
             </div>
           </div>
 
           {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar pt-1">
             <button
               onClick={() => handleCategoryChange('All')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                 selectedCategory === 'All'
-                  ? 'bg-teal-800 text-white shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700'
+                  ? 'bg-teal-800 text-white shadow-sm ring-2 ring-teal-700/40'
+                  : 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/70 dark:border-slate-700/70'
               }`}
             >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
               <span>{t('explore.allCategories')}</span>
               <span
-                className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
                   selectedCategory === 'All'
                     ? 'bg-teal-700 text-teal-100'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
@@ -238,20 +290,22 @@ export const ExplorePage: React.FC = () => {
 
             {SCHEME_CATEGORIES.map((cat) => {
               const count = categoryCounts[cat];
+              const isSelected = selectedCategory === cat;
               return (
                 <button
                   key={cat}
                   onClick={() => handleCategoryChange(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    selectedCategory === cat
-                      ? 'bg-teal-800 text-white shadow-2xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700'
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? 'bg-teal-800 text-white shadow-sm ring-2 ring-teal-700/40'
+                      : 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/70 dark:border-slate-700/70'
                   }`}
                 >
+                  {getCategoryIcon(cat)}
                   <span>{tCategory(cat)}</span>
                   {count !== undefined && (
-                    <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-                      selectedCategory === cat
+                    <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      isSelected
                         ? 'bg-teal-700 text-teal-100'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                     }`}>
@@ -311,56 +365,70 @@ export const ExplorePage: React.FC = () => {
                 return (
                   <div
                     key={scheme.id || scheme.slug}
-                    className="rounded-3xl bg-white dark:bg-slate-900 p-6 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:border-teal-400 dark:hover:border-teal-600"
+                    className="rounded-3xl bg-white dark:bg-slate-900 p-6 sm:p-7 border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group hover:border-teal-400 dark:hover:border-teal-600 hover:-translate-y-1"
                   >
-                    <div className="space-y-3">
+                    <div className="space-y-3.5">
+                      {/* Top Badges Row */}
                       <div className="flex items-center justify-between gap-2">
-                        <StatusPill type="category" value={scheme.category} size="sm" />
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusPill type="category" value={scheme.category} size="sm" />
                           <StatusPill type="level" value={scheme.level} size="sm" />
-                          <button
-                            onClick={(e) => handleSaveToggle(e, scheme)}
-                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                              isSaved
-                                ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300'
-                                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                            }`}
-                            title="Save scheme"
-                          >
-                            <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-teal-700 dark:fill-teal-400' : ''}`} />
-                          </button>
+                          <DeadlineTicker scheme={scheme} variant="badge" />
+                        </div>
+
+                        <button
+                          onClick={(e) => handleSaveToggle(e, scheme)}
+                          className={`p-2 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 ${
+                            isSaved
+                              ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300 shadow-2xs'
+                              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-750'
+                          }`}
+                          title="Save scheme"
+                        >
+                          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-teal-700 dark:fill-teal-400' : ''}`} />
+                        </button>
+                      </div>
+
+                      {/* Scheme Name & Ministry */}
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white group-hover:text-teal-800 dark:group-hover:text-teal-400 transition-colors leading-snug line-clamp-2">
+                          <Link to={`/schemes/${scheme.slug || scheme.id}`}>{scheme.name}</Link>
+                        </h3>
+
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
+                          <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{scheme.verification?.ministryOrAuthority || 'Government of India'}</span>
                         </div>
                       </div>
 
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-teal-800 dark:group-hover:text-teal-400 transition-colors leading-snug line-clamp-2">
-                        <Link to={`/schemes/${scheme.slug || scheme.id}`}>{scheme.name}</Link>
-                      </h3>
-
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{scheme.verification?.ministryOrAuthority || 'Government of India'}</span>
-                      </div>
-
+                      {/* Plain Language Summary */}
                       <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
                         {scheme.shortDescription || scheme.tagline}
                       </p>
 
-                      {mainBenefit && (
-                        <div className="p-3 rounded-2xl bg-teal-50/70 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-800/60">
-                          <span className="text-[10px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider block">
+                      {/* Key Benefit Box (Uniform Card Height & Gradient Styling) */}
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-teal-50/90 to-emerald-50/60 dark:from-teal-950/50 dark:to-slate-900/80 border border-teal-200/80 dark:border-teal-800/60 shadow-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-extrabold text-teal-800 dark:text-teal-300 uppercase tracking-wider block">
                             {t('explore.benefits')}
                           </span>
-                          <div className="font-bold text-slate-900 dark:text-white text-xs mt-0.5 truncate">
-                            {mainBenefit.amountOrValue || mainBenefit.title || mainBenefit.description}
-                          </div>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-100/90 dark:bg-teal-900/60 text-teal-900 dark:text-teal-200 border border-teal-200/60 dark:border-teal-800/60 shrink-0">
+                            {mainBenefit?.type || 'Direct Benefit'}
+                          </span>
                         </div>
-                      )}
+                        <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm mt-1 truncate">
+                          {mainBenefit
+                            ? (mainBenefit.amountOrValue || mainBenefit.title || mainBenefit.description)
+                            : 'Direct Government Financial & Welfare Support'}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="truncate max-w-[120px]">
+                    {/* Bottom Action Row */}
+                    <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[130px]">
                           {Array.isArray(scheme.coveredStates) && scheme.coveredStates.includes('All India')
                             ? tState('All India')
                             : Array.isArray(scheme.coveredStates)
@@ -371,10 +439,10 @@ export const ExplorePage: React.FC = () => {
 
                       <Link
                         to={`/schemes/${scheme.slug || scheme.id}`}
-                        className="inline-flex items-center gap-1 font-bold text-teal-800 dark:text-teal-400 hover:text-teal-950 dark:hover:text-teal-300 group-hover:translate-x-0.5 transition-all"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/70 hover:bg-teal-800 text-teal-900 dark:text-teal-300 hover:text-white dark:hover:bg-teal-700 dark:hover:text-white font-bold text-xs border border-teal-200/80 dark:border-teal-800/80 shadow-2xs transition-all group/btn"
                       >
                         <span>{t('explore.viewDetails')}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
                       </Link>
                     </div>
                   </div>

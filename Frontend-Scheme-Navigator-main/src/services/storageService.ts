@@ -6,6 +6,7 @@ import {
   Scheme,
   SchemeMatchResult,
 } from '../types';
+import { getSafeOfficialUrl, extractCleanPortalUrl } from '../components/common/ExternalPortalModal';
 
 const STORAGE_KEYS = {
   PROFILE: 'sn_user_profile_v2',
@@ -191,6 +192,12 @@ export function getTrackerItems(): TrackerItem[] {
   let hasRepaired = false;
   
   _trackerItems = _trackerItems.map((item) => {
+    // Auto-repair any legacy unparsed portal URLs stored in localStorage
+    if (item.officialPortalUrl && (item.officialPortalUrl.includes('\n') || item.officialPortalUrl.includes('Guidelines:') || item.officialPortalUrl.includes('file:///'))) {
+      item.officialPortalUrl = extractCleanPortalUrl(item.officialPortalUrl);
+      hasRepaired = true;
+    }
+
     if (
       !item.schemeName ||
       item.schemeName === 'undefined' ||
@@ -200,10 +207,7 @@ export function getTrackerItems(): TrackerItem[] {
       const match = saved.find((s) => s.id === item.schemeId || s.slug === item.schemeId);
       if (match) {
         hasRepaired = true;
-        const officialUrl =
-          match.verification?.officialPortalUrl ||
-          (match as any)?.applicationUrl ||
-          (match as any)?.officialWebsite;
+        const officialUrl = getSafeOfficialUrl(match);
         return {
           ...item,
           schemeName: match.name || item.schemeName,
@@ -235,10 +239,7 @@ export function addSchemeToTracker(
 
   const current = getTrackerItems();
   const existingIndex = current.findIndex((i) => i.schemeId === schemeId);
-  const officialPortalUrl =
-    scheme.verification?.officialPortalUrl ||
-    (scheme as any)?.applicationUrl ||
-    (scheme as any)?.officialWebsite;
+  const officialPortalUrl = getSafeOfficialUrl(scheme);
 
   const itemData: TrackerItem = {
     id: existingIndex >= 0 ? current[existingIndex].id : 'tr-' + Date.now(),
